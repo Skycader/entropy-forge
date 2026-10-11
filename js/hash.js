@@ -18,11 +18,15 @@
     return new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
   }
 
+  async function sha256Text(str){
+    return sha256(new TextEncoder().encode(str));
+  }
+
   function bytesToHex(arr){
     return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
   }
 
-  /* pure-JS MD5 (RFC 1321) — shown for reference only, never used as the actual PRNG seed */
+  /* pure-JS MD5 (RFC 1321) — a 128-bit fingerprint of the drawing; the actual seed is SHA-256(md5:salt) */
   const MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
                  5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
                  4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
@@ -68,5 +72,5 @@
     return out;
   }
 
-  EF.hash = { packPool, sha256, md5, bytesToHex };
+  EF.hash = { packPool, sha256, sha256Text, md5, bytesToHex };
 })(window.EF = window.EF || {});

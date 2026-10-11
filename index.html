@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ENTROPY_FORGE // rng from your hand</title>
+<!-- favicon (die) inlined as data URIs: no extra request, so it works the same over file:// and http://.
+     PNG first as a fallback for browsers without SVG favicons; SVG last so capable browsers pick it. -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADe0lEQVR4AbSUS0hUYRiGP48zzYwzdhkv2f22qIVRYFBR0G0TKS0Cq0UIrQqEFoXQZZEtuoDUIhBqFUiLSmgRGu0sKEhISHRhi6xMy7yVOePMOKPTeQ6cw/E/pnOmaeCd//sv3/O+Z87wa2L7BMt3tCyp2BsN7zqYDu8+lFvpTNh42CzFCODfXHGATV/hksqZ6VRB7NeYxMaGcyudCRsPvPAkiBHAFwq0aB5vwcS3rzLR3yexkSGJjY7kVjoTNh544WkE4CfJX+QriAwOSDIaYe2/Cg+88MRb8/j8B5Kx6LzmnqJl4i0rdSV6/vYkhMATby3fu6ggFY/Pebas9rRsbX8h23veyLaul65ED70w5oLjibcmeXki6RnHmY33G2R1fZ34Nq517GW6QC8MWI4ePHVvzbGhL5A6fKxSr0S+37kn3buOSGf5Pleih14gsGBSq5ozQEnNCeMcgIGbdyX+8bMkfwy7Ej30wgBmMqntcgTgz8NPx6HRJ88YDBUdPyrrbl8TRmMhwy+TARO22uYIkOf1WmemI1GjxnRD4y0pqakWRubGRgZfJoOjdjZz5AjAoqrQzopZS+p81qbLSUYBIu0ds7DqfNamy0lGAXiPn2ovynBTszAyx6dQCwiizlYZBQCO6ZcLV4WR+eXiavm95ZEhatayUcYB7HCe+nrpKWuJmjVrwUWRVQAX/AWPZhVgYiYmV4YeWnBq1qwFF0VWAeDfGGmWxT0nDVGzxv3g9rLKOgCGPDWixpxLyu1l9U8BMDalXk7q3DynjjkLoF5O6lw1NueOAOlk0tyT/FDQqhcquB+4pNTLys6ws02eI0Bq9KckevuMfd6rUWT4RQj7ZUWbyYAJmzW7HAHYHG56zCArzp+VVZfOiX/TevEuL3EleuiFAcxkUts1Z4DBxgcy9rTVOAeg/O1z2db9ypXooRcILJjUqjRJp0XynDl6z9RJf32D9Tokiw8/OwxYjnY8dW9tOjk16fH7HfsskLpr52F5v2WPdG7d70r00AsDlio88dZSiXibNxAUbzCknrHm/HmSg0PiRvRYAKXAC0+8tWj3u6rpqcRkqGzVvCEURtZTzPHCE2/j5ScisaqZVHKycOUaKVy9VgLFpRIoKs6tdCZsPPDCk6cwAsQ/dLSNd7wOJibGW7V8z2RgaVgC4ZKcyOLoTNh44IWniMgfAAAA///8OiGkAAAABklEQVQDAF1Qj53RHPncAAAAAElFTkSuQmCC">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2300141a'/%3E%3Crect x='0.75' y='0.75' width='30.5' height='30.5' rx='5.25' fill='none' stroke='%23123943' stroke-width='1.5'/%3E%3Crect x='6' y='6' width='20' height='20' rx='4' fill='none' stroke='%2334fff0' stroke-width='2.2'/%3E%3Ccircle cx='11.5' cy='11.5' r='2.1' fill='%2334fff0'/%3E%3Ccircle cx='16' cy='16' r='2.1' fill='%23ff3ecb'/%3E%3Ccircle cx='20.5' cy='20.5' r='2.1' fill='%2334fff0'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/styles.css">
 <script src="js/entropy.js" defer></script>
 <script src="js/hash.js" defer></script>
@@ -38,7 +42,23 @@
         <div class="pad-area">
           <div class="canvas-shell" id="padShell">
             <canvas id="pad"></canvas>
-            <div class="pad-hint" id="padHint"><div>рисуй здесь мышью<br>или пальцем ✎<br><b>чем хаотичнее — тем лучше</b></div></div>
+            <!-- empty-pad hint: a ghost hand draws a scribble on loop — shows the gesture, no text to read -->
+            <div class="pad-hint" id="padHint" aria-hidden="true">
+              <svg class="ghost" id="ghost" viewBox="0 0 200 200">
+                <g>
+                  <path id="ghostPath" pathLength="1" stroke-dashoffset="1" d="M30 140 C50 40 80 170 100 90 S150 30 170 120 S120 170 60 110"/>
+                  <circle class="ghost-pen" r="4">
+                    <animateMotion dur="3.2s" repeatCount="indefinite" calcMode="spline"
+                      keyPoints="0;1;1" keyTimes="0;.7;1" keySplines=".45 0 .55 1;0 0 1 1">
+                      <mpath href="#ghostPath"/>
+                    </animateMotion>
+                  </circle>
+                  <animate attributeName="opacity" values="1;1;0" keyTimes="0;.72;1" dur="3.2s" repeatCount="indefinite"/>
+                </g>
+                <animate href="#ghostPath" attributeName="stroke-dashoffset" values="1;0;0" keyTimes="0;.7;1"
+                  dur="3.2s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;0 0 1 1"/>
+              </svg>
+            </div>
             <button class="pad-clear" id="resetBtn" type="button" aria-label="Очистить пул" title="Очистить пул" disabled>
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 7h16"/>
@@ -115,6 +135,28 @@
           <button class="primary" id="genBtn" disabled>▶ СГЕНЕРИРОВАТЬ</button>
         </div>
 
+        <!-- seed inputs: result = f(md5, salt) only — same fields, same output -->
+        <div class="gen-line2">
+          <div class="combo">
+            <span class="combo-tag">md5</span>
+            <input type="text" id="md5Input" spellcheck="false" autocomplete="off" placeholder="нарисуй что-нибудь" aria-label="md5 рисунка">
+            <label class="sync" title="синхронизировать с рисунком">
+              <input type="checkbox" id="md5Sync" checked aria-label="синхронизировать с рисунком"><span class="tick"></span>
+            </label>
+          </div>
+          <div class="combo has-range">
+            <span class="combo-tag">salt</span>
+            <input type="text" id="saltInput" spellcheck="false" autocomplete="off" placeholder="без соли" aria-label="соль">
+            <label class="sync" title="брать текущий unix timestamp">
+              <input type="checkbox" id="saltSync" checked aria-label="брать текущий unix timestamp"><span class="tick"></span>
+            </label>
+            <div class="combo-range" title="частота обновления timestamp">
+              <input type="range" id="saltRate" min="0" max="1000" step="1" value="0" aria-label="частота обновления timestamp">
+              <span class="rate-label" id="saltRateLabel">1 мс</span>
+            </div>
+          </div>
+        </div>
+
         <div class="result-shell">
           <div class="result-readout">
             <span class="placeholder" id="resultPlaceholder">результат появится здесь</span>
@@ -131,18 +173,18 @@
         <summary class="panel-head"><span><span class="dot"></span>SEED / HASH</span><span class="caret"></span></summary>
         <div class="hash-body">
           <div class="hash-row">
-            <span class="hash-label">MD5(рисунок)</span>
-            <span class="hash-val" id="md5Val">—</span>
+            <span class="hash-label">вход (md5:salt)</span>
+            <span class="hash-val" id="seedSrcVal">—</span>
           </div>
           <div class="hash-row">
-            <span class="hash-label">SHA-256(рисунок)</span>
+            <span class="hash-label">SHA-256(вход)</span>
             <span class="hash-val" id="sha256Val">—</span>
           </div>
           <div class="hash-row">
-            <span class="hash-label">SEED (из SHA-256)</span>
+            <span class="hash-label">SEED (sfc32)</span>
             <span class="hash-val" id="seedVal">—</span>
           </div>
-          <div class="hash-note">md5 показан для справки — <span class="warn">он криптографически сломан</span>, seed для генератора всегда берётся из sha-256. клик по хешу — копировать.</div>
+          <div class="hash-note">seed — первые 16 байт SHA-256 от строки <code>md5:salt</code>. одинаковые md5 и salt → одинаковый результат. клик по значению — копировать.</div>
         </div>
       </details>
 
@@ -161,9 +203,12 @@
         <div class="about-body">
           Каждая точка рисунка — это <code>{x, y, t}</code>, где <code>t</code> — время с
           субмиллисекундной точностью. Направление штриха и джиттер тайминга дают
-          приблизительную энтропию по Шеннону (в битах). После нажатия «Сгенерировать» весь
-          накопленный пул точек хешируется алгоритмом <code>SHA-256</code>, и результат становится
-          seed'ом для генератора псевдослучайных чисел (<code>sfc32</code>). Оценка «перебор займёт»
+          приблизительную энтропию по Шеннону (в битах). Пул точек сворачивается в <code>md5</code> —
+          128-битный отпечаток рисунка. При нажатии «Сгенерировать» строка <code>md5:salt</code>
+          хешируется <code>SHA-256</code>, и первые 16 байт становятся seed'ом генератора
+          псевдослучайных чисел (<code>sfc32</code>). Результат зависит только от этих двух полей:
+          их можно вписать вручную и воспроизвести любое прошлое значение, а соль-timestamp
+          делает каждый клик уникальным. Оценка «перебор займёт»
           — это <code>2^bits / 2</code> попыток при условной скорости атакующего 10¹² попыток/сек.
           Оценка ограничена 128 битами — это размер внутреннего состояния <code>sfc32</code>,
           больше энтропии до результата всё равно не дойдёт.

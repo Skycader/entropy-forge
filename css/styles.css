@@ -188,7 +188,15 @@ h1 span{ color:var(--magenta); text-shadow:var(--glow-magenta); }
   transition:opacity .3s ease;
   letter-spacing:.02em;
 }
-.pad-hint b{ color:var(--fg-0); }
+.pad-hint .ghost{
+  width:78%; height:78%; overflow:visible;
+  filter:drop-shadow(0 0 4px rgba(52,255,240,.55));
+}
+.pad-hint .ghost path{
+  fill:none; stroke:var(--cyan); stroke-opacity:.45; stroke-width:1.6; stroke-linecap:round;
+  stroke-dasharray:1; /* dashoffset lives on the element so the SMIL animation drives it */
+}
+.pad-hint .ghost-pen{ fill:var(--cyan); }
 
 /* clear-pool button in the pad's bottom-right corner; hidden while the pool is empty */
 button.pad-clear{
@@ -303,6 +311,103 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .field input:disabled{ opacity:.6; }
 .field input:focus{ outline:none; border-color:var(--cyan); }
 .gen-line #genBtn{ flex:none; white-space:nowrap; }
+
+/* ---- seed inputs: [tag | text | ✓] with an optional built-in rate slider along the bottom edge ---- */
+.gen-line2{
+  display:flex; gap:10px; align-items:stretch;
+  padding:0 14px 12px;
+}
+.combo{
+  flex:1 1 0; min-width:0;
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center;
+  background:var(--bg-0); border:1px solid var(--line); border-radius:2px;
+  transition:border-color .15s ease;
+}
+.combo:first-child{ flex-grow:1.4; } /* the md5 is the longer value */
+.combo:focus-within{ border-color:var(--cyan); }
+.combo-tag{
+  padding:0 2px 0 10px;
+  font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--fg-dim);
+}
+.combo input[type=text]{
+  min-width:0; width:100%;
+  background:transparent; border:none; outline:none;
+  color:var(--fg-1);
+  font-family:'Share Tech Mono', monospace; font-size:13.5px;
+  padding:8px 6px;
+}
+.combo input[type=text]::placeholder{ color:var(--fg-dim); }
+
+/* checkbox inside the field */
+.sync{
+  position:relative; display:grid; place-items:center;
+  width:30px; height:30px; margin-right:3px;
+  cursor:pointer;
+}
+.sync input{ position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
+.sync .tick{
+  width:16px; height:16px; border-radius:2px;
+  border:1px solid var(--fg-dim);
+  display:grid; place-items:center;
+  transition:all .15s ease;
+}
+.sync .tick::after{
+  content:""; width:8px; height:4px; margin-top:-2px;
+  border:solid var(--bg-0); border-width:0 0 2px 2px;
+  transform:rotate(-45deg);
+  opacity:0;
+}
+.sync input:checked + .tick{ background:var(--cyan); border-color:var(--cyan); box-shadow:var(--glow-cyan); }
+.sync input:checked + .tick::after{ opacity:1; }
+.sync:hover .tick{ border-color:var(--cyan); }
+.sync input:focus-visible + .tick{ outline:2px solid var(--cyan); outline-offset:2px; }
+
+/* rate slider: a thin rail along the bottom of the salt field, label rides next to the thumb */
+.combo-range{
+  --p:0; /* thumb position 0..1, set from JS */
+  grid-column:1/-1;
+  position:relative;
+  height:14px; margin:-3px 8px 3px;
+}
+.combo-range input[type=range]{
+  -webkit-appearance:none; appearance:none;
+  display:block; width:100%; height:14px; margin:0;
+  background:transparent; cursor:pointer;
+}
+.combo-range input[type=range]:focus{ outline:none; }
+.combo-range input[type=range]::-webkit-slider-runnable-track{
+  height:2px; border-radius:1px;
+  background:linear-gradient(90deg, var(--cyan) calc(var(--p) * 100%), var(--line) 0);
+}
+.combo-range input[type=range]::-moz-range-track{ height:2px; background:var(--line); }
+.combo-range input[type=range]::-moz-range-progress{ height:2px; background:var(--cyan); }
+.combo-range input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:10px; height:10px; margin-top:-4px;
+  background:var(--cyan); border:none; border-radius:1px;
+  transform:rotate(45deg);
+  box-shadow:var(--glow-cyan);
+}
+.combo-range input[type=range]::-moz-range-thumb{
+  width:9px; height:9px; border:none; border-radius:1px;
+  background:var(--cyan); transform:rotate(45deg); box-shadow:var(--glow-cyan);
+}
+.combo-range input[type=range]:focus-visible::-webkit-slider-thumb{ outline:2px solid var(--fg-1); }
+.rate-label{
+  position:absolute; top:50%;
+  /* just right of the thumb: thumb centre = 5px + p × (width − 10px) */
+  left:calc(5px + var(--p) * (100% - 10px) + 10px);
+  transform:translateY(-50%);
+  padding:0 4px;
+  background:var(--bg-0); /* masks the rail behind the text */
+  font-size:9.5px; line-height:1; letter-spacing:.06em; color:var(--cyan);
+  white-space:nowrap; pointer-events:none;
+  opacity:0; transition:opacity .15s ease;
+}
+.combo-range.show-label .rate-label{ opacity:1; }
+.rate-label.flip{ transform:translate(calc(-100% - 20px), -50%); }
+/* when the timestamp isn't live, the rail fades (it re-enables the sync when touched) */
+.combo.has-range:not(:has(#saltSync:checked)) .combo-range{ opacity:.45; }
 
 .result-shell{ padding:0 14px 14px; }
 .result-readout{
@@ -460,7 +565,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   }
   .pad-panel{ flex:1 1 auto; }
   .pad-body{ padding:10px; gap:10px; }
-  .pad-area{ min-height:min(200px, 60vw); }
+  .pad-area{ min-height:min(180px, 50vw); }
 
   .meter-row{ gap:8px; }
   .meter{ padding:6px 10px; }
@@ -502,6 +607,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .field{ min-width:56px; }
   .quality-label{ white-space:normal; }
   .log{ max-height:96px; }
+  /* the right column is narrow here but has spare height: md5 and salt go on separate lines */
+  .gen-line2{ flex-wrap:wrap; }
+  .combo{ min-width:170px; }
 }
 
 /* compact controls, shared by phones and short landscape screens */
@@ -511,6 +619,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .type-tabs button{ padding:7px 4px; font-size:11px; }
   .gen-line{ padding:10px; gap:8px; }
   .gen-line #genBtn{ padding:9px 10px; }
+  .gen-line2{ padding:0 10px 10px; gap:8px; }
+  .combo:first-child{ flex-grow:1; } /* the timestamp needs its full 13 digits; the md5 can scroll */
+  .combo-tag{ padding-left:8px; font-size:9.5px; letter-spacing:.06em; }
+  .combo input[type=text]{ font-size:12.5px; padding:7px 4px; }
+  .sync{ width:28px; margin-right:1px; }
   .result-shell{ padding:0 10px 10px; }
   .result-readout{ min-height:44px; padding:8px 10px; }
 
