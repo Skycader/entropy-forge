@@ -294,6 +294,15 @@ if (djb2("олень") > djb2("погода")) {
 
   /* ---------------- Stats ---------------- */
 
+  // strength label under the bar, by estimated bits (upper bounds are exclusive)
+  const STRENGTH_LEVELS = [
+    { below: 40,       label: 'Слабая — подбирается за секунды',                                    color: 'var(--amber)' },
+    { below: 64,       label: 'Низкая — по силам обычному компьютеру',                              color: 'var(--amber)' },
+    { below: 80,       label: 'Средняя — нужны большие дата-центры для перебора',                   color: 'var(--cyan)' },
+    { below: 128,      label: 'Высокая — перебор возможен вычислительными силами всей планеты',     color: 'var(--cyan)' },
+    { below: Infinity, label: 'Максимальная — перебор невозможен в обозримом будущем',              color: 'var(--magenta)' },
+  ];
+
   function updateStats(){
     const bits = sourceBits();
     bitsValueEl.textContent = bits.toFixed(1) + ' бит';
@@ -315,13 +324,9 @@ if (djb2("олень") > djb2("погода")) {
       const pct = Math.min(100, (bits/maxBits())*100);
       qualityFillEl.style.width = pct + '%';
 
-      let label, color;
-      if(bits < 20){ label='слабо — почти case для взлома за кофе-брейк'; color='var(--amber)'; }
-      else if(bits < 48){ label='средне — сгодится для игры в кости'; color='var(--cyan)'; }
-      else if(bits < 90){ label='неплохо — уже не тривиально'; color='var(--cyan)'; }
-      else { label='параноидально — вселенная не успеет остыть'; color='var(--magenta)'; }
-      qualityLabelEl.textContent = label;
-      qualityLabelEl.style.color = color;
+      const level = STRENGTH_LEVELS.find(l => bits < l.below);
+      qualityLabelEl.textContent = level.label;
+      qualityLabelEl.style.color = level.color;
     }
   }
 

@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500;700&display=swap');
+/* JetBrains Mono, self-hosted (fonts/, SIL OFL 1.1 — see fonts/OFL.txt): works offline and over file:// */
+@font-face{ font-family:'JetBrains Mono'; src:url('../fonts/JetBrainsMono-Regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face{ font-family:'JetBrains Mono'; src:url('../fonts/JetBrainsMono-Medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face{ font-family:'JetBrains Mono'; src:url('../fonts/JetBrainsMono-Bold.woff2') format('woff2'); font-weight:700; font-style:normal; font-display:swap; }
+@font-face{ font-family:'JetBrains Mono'; src:url('../fonts/JetBrainsMono-Italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
 
 :root{
   color-scheme: dark; /* the CRT look is dark-only; keeps native controls/scrollbars dark too */
@@ -82,12 +86,12 @@ body::after{
 }
 .brand{ display:flex; align-items:baseline; gap:12px; }
 .brand .glyph{
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:13px; color:var(--fg-dim);
   letter-spacing:.15em;
 }
 h1{
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:clamp(24px, 3.2vw, 38px);
   line-height:1.1;
   letter-spacing:.03em;
@@ -133,7 +137,7 @@ h1 span{ color:var(--magenta); text-shadow:var(--glow-magenta); }
   min-height:38px;
   padding:6px 14px;
   border-bottom:1px solid var(--line);
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:11.5px;
   letter-spacing:.14em;
   color:var(--fg-dim);
@@ -152,7 +156,7 @@ button.src-tab{
   display:flex; align-items:center; gap:7px;
   padding:0 10px;
   background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0;
-  font-family:'Share Tech Mono', monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--fg-dim);
 }
 button.src-tab:hover:not(:disabled){ color:var(--fg-1); border-color:transparent; box-shadow:none; }
@@ -220,7 +224,7 @@ button.src-tab:focus-visible{ outline-offset:-2px; }
   margin:0; padding:14px 16px 52px; /* bottom room for the clear button */
   background:transparent; border:none; outline:none; resize:none;
   color:var(--fg-1); caret-color:var(--cyan);
-  font-family:'Share Tech Mono', monospace; font-size:16px; line-height:1.5;
+  font-family:'JetBrains Mono', monospace; font-size:16px; line-height:1.5;
   word-break:break-all;
 }
 .text-shell textarea::selection{ background:rgba(255,62,203,.35); }
@@ -228,7 +232,7 @@ button.src-tab:focus-visible{ outline-offset:-2px; }
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
   pointer-events:none;
-  font-family:'Share Tech Mono', monospace; font-size:22px; letter-spacing:.08em;
+  font-family:'JetBrains Mono', monospace; font-size:22px; letter-spacing:.08em;
   color:var(--cyan); opacity:.5;
   text-shadow:var(--glow-cyan);
   transition:opacity .2s ease;
@@ -277,7 +281,7 @@ button.pad-clear:disabled{ opacity:0; pointer-events:none; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .meter .value{
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:17px; color:var(--cyan); text-shadow:var(--glow-cyan);
   margin-top:2px;
 }
@@ -290,7 +294,8 @@ button.pad-clear:disabled{ opacity:0; pointer-events:none; }
 }
 .quality-bar i{
   display:block; height:100%; width:0%;
-  background:linear-gradient(90deg, var(--amber), var(--cyan), var(--magenta));
+  background:var(--cyan);
+  box-shadow:var(--glow-cyan);
   transition:width .18s ease;
 }
 .quality-label{
@@ -319,6 +324,8 @@ button.primary{
 }
 button.primary:hover:not(:disabled){ box-shadow:var(--glow-cyan); }
 button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transform:none; }
+button.icon-btn{ display:grid; place-items:center; padding:4px 6px; }
+button.icon-btn:hover:not(:disabled){ color:var(--amber); border-color:var(--amber); box-shadow:var(--glow-amber); }
 
 /* ---- right column: fixed-size panels + a log that takes whatever height is left ---- */
 .right-col{
@@ -383,7 +390,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
   min-width:0; width:100%;
   background:transparent; border:none; outline:none;
   color:var(--fg-1);
-  font-family:'Share Tech Mono', monospace; font-size:13.5px;
+  font-family:'JetBrains Mono', monospace; font-size:13.5px;
   padding:8px 6px 8px 10px;
 }
 
@@ -491,7 +498,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .result-readout .rv{
   min-width:0;
   max-height:4.2em; overflow-y:auto; /* long strings scroll inside instead of growing the panel */
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:clamp(16px, 1.9vw, 22px);
   line-height:1.35;
   color:var(--magenta);
@@ -506,6 +513,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .hash-panel > summary{ list-style:none; cursor:pointer; }
 .hash-panel > summary::-webkit-details-marker{ display:none; }
 .hash-panel > summary:hover{ color:var(--cyan); }
+.hash-panel > summary .short{ display:none; } /* the phone toggle row shows the short name */
 .hash-panel .caret::before{ content:"▸ показать"; letter-spacing:.06em; text-transform:none; }
 .hash-panel[open] .caret::before{ content:"▾ скрыть"; }
 .hash-panel:not([open]) > summary{ border-bottom:none; }
@@ -524,7 +532,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .hash-val{
   flex:1; min-width:0;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; /* full value in title / clipboard */
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:12px;
   color:var(--fg-1);
   cursor:pointer;
@@ -561,7 +569,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .tip .formula{
   margin:7px 0 0; padding:7px 9px;
   background:var(--bg-1); border-left:2px solid var(--magenta);
-  font-family:'Share Tech Mono', monospace; font-size:12.5px; line-height:1.6;
+  font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.6;
   color:var(--cyan); white-space:pre;
 }
 .tip .formula .dim{ color:var(--fg-dim); }
@@ -608,7 +616,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
   align-items:center;
 }
 .log-row .tag{
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:10.5px;
   color:var(--bg-0);
   background:var(--cyan);
@@ -634,7 +642,7 @@ details.about{
 }
 details.about summary{
   cursor:pointer; padding:10px 0;
-  font-family:'Share Tech Mono', monospace;
+  font-family:'JetBrains Mono', monospace;
   font-size:11.5px; letter-spacing:.12em; color:var(--fg-dim);
   text-transform:uppercase;
 }
@@ -730,6 +738,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .meter .sub{ display:none; }
   .meter .value{ font-size:14px; }
   .field{ min-width:56px; }
+  /* narrow right column: shrink the type tabs so randInt / double / randomString fit */
+  .gen-panel .type-tabs button{ font-size:10px; padding:7px 2px; letter-spacing:0; }
   .quality-label{ white-space:normal; }
   .log{ max-height:96px; }
   /* the right column is narrow here but has spare height: md5 and salt go on separate lines */
@@ -771,6 +781,8 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   details.about summary{ display:flex; align-items:center; padding:4px 0; }
   details.about summary .long{ display:none; }
   details.about summary .short{ display:inline; }
+  .hash-panel > summary .long{ display:none; }
+  .hash-panel > summary .short{ display:inline; }
   details.about[open] summary .long{ display:inline; }
   details.about[open] summary .short{ display:none; }
 
