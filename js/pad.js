@@ -7,6 +7,9 @@
     let points = [];
     let activePointer = null; // pointerId of the stroke in progress, null when idle
     let liftPen = false;      // pointer left the pad mid-stroke -> next point starts a new stroke
+    // the pad resizes with the viewport; points are stored in the coordinate space of the pad
+    // as it was when the pool started, and scaled to the current size when drawn
+    let refWidth = null;
 
     function resize(){
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -21,12 +24,15 @@
       const rect = shell.getBoundingClientRect();
       ctx.clearRect(0,0,rect.width,rect.height);
       if(points.length < 2) return;
+      const k = rect.width / refWidth;
+      ctx.save();
+      ctx.scale(k, k);
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       ctx.shadowBlur = 8;
       ctx.shadowColor = 'rgba(52,255,240,0.8)';
       ctx.strokeStyle = 'rgba(52,255,240,0.85)';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 / k;
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for(let i=1;i<points.length;i++){
@@ -40,6 +46,7 @@
         }
       }
       ctx.stroke();
+      ctx.restore();
     }
 
     function addPoint(e, newStroke){
@@ -51,7 +58,9 @@
         liftPen = true;
         return;
       }
-      points.push({x, y, t: performance.now(), newStroke: newStroke || liftPen});
+      if(refWidth === null) refWidth = rect.width;
+      const s = refWidth / rect.width;
+      points.push({x: x*s, y: y*s, t: performance.now(), newStroke: newStroke || liftPen});
       liftPen = false;
       redraw();
       onChange(points);
@@ -59,6 +68,7 @@
 
     shell.addEventListener('pointerdown', e => {
       if(activePointer !== null) return; // ignore extra fingers
+      if(e.target.closest('button')) return; // controls overlaid on the pad don't draw
       activePointer = e.pointerId;
       shell.setPointerCapture(e.pointerId);
       addPoint(e, true);
@@ -78,6 +88,9 @@
     shell.addEventListener('pointercancel', endStroke);
     shell.addEventListener('lostpointercapture', endStroke);
 
+    // the shell's size follows the layout (viewport, opened panels), not just window resizes;
+    // window resize additionally catches DPR changes (zoom, moving between monitors)
+    new ResizeObserver(resize).observe(shell);
     window.addEventListener('resize', resize);
     resize();
 
@@ -87,6 +100,7 @@
         points = [];
         activePointer = null;
         liftPen = false;
+        refWidth = null;
         redraw();
       }
     };

@@ -70,28 +70,31 @@
     return log10Years; // returned as log10(years)
   }
 
+  // -> {value, note}: short readout + an optional human-scale comparison
   function formatYears(log10Years){
-    if(log10Years < -6) return '< 1 мкс здравого смысла';
+    if(log10Years < -6) return { value: '< 1 мкс', note: 'мгновенно' };
     if(log10Years < 0){
       const years = Math.pow(10, log10Years);
       const seconds = years * SECONDS_PER_YEAR;
-      if(seconds < 1) return (seconds*1000).toFixed(1) + ' мс';
-      if(seconds < 60) return seconds.toFixed(1) + ' сек';
-      if(seconds < 3600) return (seconds/60).toFixed(1) + ' мин';
-      if(seconds < 86400) return (seconds/3600).toFixed(1) + ' ч';
-      return (seconds/86400).toFixed(1) + ' дн';
+      let value;
+      if(seconds < 1) value = (seconds*1000).toFixed(1) + ' мс';
+      else if(seconds < 60) value = seconds.toFixed(1) + ' сек';
+      else if(seconds < 3600) value = (seconds/60).toFixed(1) + ' мин';
+      else if(seconds < 86400) value = (seconds/3600).toFixed(1) + ' ч';
+      else value = (seconds/86400).toFixed(1) + ' дн';
+      return { value, note: '' };
     }
     if(log10Years < 3){
-      return Math.pow(10, log10Years).toFixed(1) + ' лет';
+      return { value: Math.pow(10, log10Years).toFixed(1) + ' лет', note: '' };
     }
     // scientific notation for big numbers, with cheeky milestones
     const exp = Math.floor(log10Years);
     const mant = Math.pow(10, log10Years - exp);
     let note = '';
-    if(exp >= 10 && exp < 17) note = ' (дольше существования Земли)';
-    else if(exp >= 17 && exp < 100) note = ' (дольше жизни Вселенной)';
-    else if(exp >= 100) note = ' (числа без физического смысла)';
-    return mant.toFixed(2) + '×10^' + exp + ' лет' + note;
+    if(exp >= 10 && exp < 17) note = 'дольше существования Земли';
+    else if(exp >= 17 && exp < 100) note = 'дольше жизни Вселенной';
+    else if(exp >= 100) note = 'числа без физического смысла';
+    return { value: mant.toFixed(2) + '×10^' + exp + ' лет', note };
   }
 
   EF.entropy = { MAX_BITS, estimateBits, bitsToYears, formatYears };

@@ -11,7 +11,9 @@
   const padHint = $('padHint');
   const ptCountEl = $('ptCount');
   const bitsValueEl = $('bitsValue');
+  const bitsSubEl = $('bitsSub');
   const yearsValueEl = $('yearsValue');
+  const yearsSubEl = $('yearsSub');
   const qualityFillEl = $('qualityFill');
   const qualityLabelEl = $('qualityLabel');
   const md5ValEl = $('md5Val');
@@ -22,6 +24,7 @@
 
   const pad = EF.createPad($('padShell'), $('pad'), pts => {
     padHint.style.opacity = '0';
+    resetBtn.disabled = false;
     ptCountEl.textContent = pts.length + ' pts';
     updateStats();
     scheduleHashUpdate();
@@ -40,6 +43,7 @@
     clearTimeout(hashUpdateTimer);
     ptCountEl.textContent = '0 pts';
     padHint.style.opacity = '1';
+    resetBtn.disabled = true;
     showHashes(null);
     updateStats();
   });
@@ -51,13 +55,19 @@
     const bits = estimateBits(points);
     bitsValueEl.textContent = bits.toFixed(1) + ' бит';
 
+    bitsSubEl.textContent = 'максимум ' + MAX_BITS;
+
     if(points.length < 3){
       yearsValueEl.textContent = '—';
+      yearsSubEl.innerHTML = '&nbsp;';
       qualityFillEl.style.width = '0%';
       qualityLabelEl.textContent = 'пул пуст — начни рисовать';
       qualityLabelEl.style.color = 'var(--fg-dim)';
     } else {
-      yearsValueEl.textContent = formatYears(bitsToYears(bits));
+      const years = formatYears(bitsToYears(bits));
+      yearsValueEl.textContent = years.value;
+      yearsSubEl.textContent = years.note || ' ';
+      yearsValueEl.title = years.note ? years.value + ' — ' + years.note : years.value;
 
       const pct = Math.min(100, (bits/MAX_BITS)*100);
       qualityFillEl.style.width = pct + '%';
@@ -77,11 +87,28 @@
 
   /* ---------------- Hash display ---------------- */
 
+  // values are ellipsized in the UI, so the full hex also goes into the tooltip
   function showHashes(h){
-    md5ValEl.textContent = h ? h.md5 : '—';
-    sha256ValEl.textContent = h ? h.sha256 : '—';
-    seedValEl.textContent = h ? h.seed : '—';
+    for(const [el, v] of [[md5ValEl, h && h.md5], [sha256ValEl, h && h.sha256], [seedValEl, h && h.seed]]){
+      el.textContent = v || '—';
+      el.title = v ? v + ' — клик, чтобы скопировать' : '';
+    }
   }
+
+  /* ---------------- Compact (phone) layout ---------------- */
+
+  // must match the phone media query in styles.css
+  const compact = matchMedia('(max-width: 879px) and (orientation: portrait), (max-width: 639px), (max-height: 500px) and (orientation: landscape)');
+  const logPanel = $('logPanel');
+
+  // secondary panels start collapsed where height is scarce, leaving room for the pad
+  if(compact.matches || matchMedia('(max-height: 560px)').matches) $('hashPanel').open = false;
+  if(compact.matches) logPanel.classList.add('collapsed');
+
+  $('logHead').addEventListener('click', e => {
+    if(!compact.matches || e.target.closest('button')) return;
+    logPanel.classList.toggle('collapsed');
+  });
 
   let hashUpdateTimer = null;
   function scheduleHashUpdate(){
