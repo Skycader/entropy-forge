@@ -205,6 +205,10 @@
                the other row previews the same source with the other hash. Tooltips are set from js/app.js -->
           <div class="alg-rows" role="radiogroup" aria-label="Алгоритм хеширования">
             <div class="hash-row alg-row">
+              <label class="hash-label radio" id="djb2Label"><input type="radio" name="alg" value="djb2"><span class="mark"></span>DJB2</label>
+              <span class="hash-val" id="djb2Val">—</span>
+            </div>
+            <div class="hash-row alg-row">
               <label class="hash-label radio" id="md5Label"><input type="radio" name="alg" value="md5" checked><span class="mark"></span>MD5</label>
               <span class="hash-val" id="md5Val">—</span>
             </div>
@@ -245,7 +249,8 @@
           Каждая точка рисунка — это <code>{x, y, t}</code>, где <code>t</code> — время с
           субмиллисекундной точностью. Направление штриха и джиттер тайминга дают
           приблизительную энтропию по Шеннону (в битах). Во вкладке «текст» источником служит сам текст: оценка — размер алфавита × число символов с поправкой на повторы и предсказуемость языка. Хеш-функция <code>H</code>
-          выбирается в таблице SEED / HASH — <code>md5</code> или <code>sha256</code>:
+          выбирается в таблице SEED / HASH — <code>djb2</code>, <code>md5</code> или <code>sha256</code>
+          (у djb2 всего 4 байта, поэтому seed набирается счётчиком: <code>djb2(…:0) ‖ djb2(…:1) ‖ …</code>, а энтропия ограничена 32 битами):
           <br><code>отпечаток = H(источник)</code> — текст хешируется как есть, в UTF-8;
           <br><code>seed = начало H(отпечаток:соль)</code> — смешивает отпечаток с солью;
           <br><code>числа = G(seed)</code> — генератор псевдослучайных чисел <code>G</code>, тоже на выбор в таблице:

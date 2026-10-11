@@ -565,6 +565,19 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
   color:var(--cyan); white-space:pre;
 }
 .tip .formula .dim{ color:var(--fg-dim); }
+/* wide tooltip with a source-code listing */
+.tip.wide{ max-width:min(620px, calc(100vw - 16px)); }
+.tip pre.code{
+  margin:7px 0 0; padding:8px 10px;
+  background:var(--bg-1); border-left:2px solid var(--magenta);
+  font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.55;
+  color:var(--fg-1); white-space:pre-wrap; tab-size:4;
+  font-variant-ligatures:none; /* show |= and >>> as typed, not as ligature glyphs */
+}
+.tip pre.code .kw{ color:var(--magenta); }
+.tip pre.code .str{ color:var(--amber); }
+.tip pre.code .num{ color:var(--cyan); }
+.tip pre.code .com{ color:var(--fg-dim); font-style:italic; }
 
 .hash-note{
   font-size:10.5px; color:var(--fg-dim); line-height:1.5;
@@ -647,6 +660,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
 /* short desktop windows: trim secondary text first */
 @media (max-height: 820px){
   .hash-note{ display:none; }
+}
+/* the hash table has five rows: tighten it (and let the log shrink a bit more) on shorter screens */
+@media (max-height: 760px){
+  .hash-row{ padding:2px 0; }
+  .log-panel{ min-height:60px; }
 }
 @media (max-height: 680px){
   :root{ --pad:12px; --gap:10px; }

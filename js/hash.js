@@ -1,4 +1,4 @@
-/* Pool serialization + hashing: MD5 and SHA-256, both pure JS and synchronous */
+/* Pool serialization + hashing: DJB2, MD5 and SHA-256, all pure JS and synchronous */
 (function (EF) {
   "use strict";
 
@@ -111,14 +111,37 @@
     return out;
   }
 
+  /* ---------------- DJB2 (Dan Bernstein): hash = hash·33 + c, 32 bits ---------------- */
+
+  // exactly the reference code shown in the UI tooltip: text goes in as JS char codes (UTF-16 units)
+  function djb2(str){
+    let hash = 5381;
+    for(let i = 0; i < str.length; i++){
+      hash = ((hash << 5) + hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash >>> 0;
+  }
+  // same recurrence over raw bytes (the drawing has no text form)
+  function djb2Bytes(buf){
+    let hash = 5381;
+    for(const b of new Uint8Array(buf)){
+      hash = ((hash << 5) + hash) + b;
+      hash |= 0;
+    }
+    return hash >>> 0;
+  }
+  const u32be = n => Uint8Array.of(n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255);
+
   /* ---------------- selectable algorithm ---------------- */
 
   const ALGS = { md5, sha256 };
   const utf8 = new TextEncoder();
 
-  // digest of raw bytes / of a UTF-8 string with the chosen algorithm ('md5' | 'sha256')
-  const digest = (alg, buf) => ALGS[alg](buf);
-  const digestText = (alg, str) => ALGS[alg](utf8.encode(str));
+  // digest of raw bytes / of a string with the chosen algorithm ('djb2' | 'md5' | 'sha256').
+  // md5/sha256 hash a string's UTF-8 bytes; djb2 hashes its char codes, like the reference code
+  const digest = (alg, buf) => alg === 'djb2' ? u32be(djb2Bytes(buf)) : ALGS[alg](buf);
+  const digestText = (alg, str) => alg === 'djb2' ? u32be(djb2(str)) : ALGS[alg](utf8.encode(str));
 
-  EF.hash = { packPool, md5, sha256, digest, digestText, bytesToHex };
+  EF.hash = { packPool, md5, sha256, djb2, digest, digestText, bytesToHex };
 })(window.EF = window.EF || {});

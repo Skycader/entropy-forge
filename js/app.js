@@ -22,7 +22,7 @@
   const yearsSubEl = $('yearsSub');
   const qualityFillEl = $('qualityFill');
   const qualityLabelEl = $('qualityLabel');
-  const algValEl = { md5: $('md5Val'), sha256: $('sha256Val') };
+  const algValEl = { djb2: $('djb2Val'), md5: $('md5Val'), sha256: $('sha256Val') };
   const genValEl = { lcg: $('lcgVal'), sfc32: $('sfc32Val') };
   const genBtn = $('genBtn');
   const resetBtn = $('resetBtn');
@@ -145,7 +145,49 @@
 
   /* ---------------- hash algorithm (radio) ---------------- */
 
+  // reference DJB2 source shown in its tooltip (same algorithm as djb2() in js/hash.js);
+  // the expected outputs in the comments are the real ones — verified against that function
+  const DJB2_SOURCE =
+`function djb2(str) {
+    let hash = 5381; // "Магическое" стартовое число (чистый хаос)
+    for (let i = 0; i < str.length; i++) {
+        // Смешиваем текущий хэш с кодом буквы: hash = hash * 33 + charCode
+        hash = ((hash << 5) + hash) + str.charCodeAt(i);
+        hash |= 0; // Превращаем в 32-битное целое число (чтобы не росло до бесконечности)
+    }
+    return hash >>> 0; // Делаем число строго положительным [0, 4294967295]
+}
+
+// Тест для твоей игры:
+console.log(djb2("олень"));  // ${EF.hash.djb2('олень')}
+console.log(djb2("погода")); // ${EF.hash.djb2('погода')}
+
+// Сравниваем в одну строчку:
+if (djb2("олень") > djb2("погода")) {
+    console.log("Олень победил!");
+}`;
+
+  // minimal JS highlighter for that listing: one left-to-right pass, so comments win over the quotes inside them
+  function highlightJs(code){
+    const esc = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc.replace(/(\/\/.*$)|("(?:[^"\\\n]|\\.)*")|\b(function|let|for|return|if)\b|\b(\d+)\b/gm,
+      (m, com, str, kw, num) =>
+        com ? '<span class="com">' + com + '</span>' :
+        str ? '<span class="str">' + str + '</span>' :
+        kw  ? '<span class="kw">' + kw + '</span>' :
+              '<span class="num">' + num + '</span>');
+  }
+
   const ALG_INFO = {
+    djb2: {
+      name: 'DJB2', bits: 32,
+      tipHtml:
+        '<p>DJB2 — простейшая хеш-функция Дэна Бернштейна: каждый символ умножает хеш на 33 и прибавляется. ' +
+        'Результат — одно 32-битное число (его и видно в поле). Очень быстрая, но не криптографическая: ' +
+        'коллизии подбираются легко, а энтропия ограничена 32 битами. Рисунок хешируется по байтам. ' +
+        'Через двоеточие приписана соль.</p>' +
+        '<pre class="code">' + highlightJs(DJB2_SOURCE) + '</pre>',
+    },
     md5: {
       name: 'MD5', bits: 128,
       tip: 'MD5 — хеш-функция: превращает рисунок или текст любого размера в отпечаток из 32 hex-символов (128 бит). ' +
@@ -161,8 +203,15 @@
   };
   let alg = document.querySelector('input[name=alg]:checked').value;
 
+  $('djb2Label').dataset.tipHtml = ALG_INFO.djb2.tipHtml;
+  $('djb2Label').dataset.tipWide = '';
   $('md5Label').dataset.tip = ALG_INFO.md5.tip;
   $('sha256Label').dataset.tip = ALG_INFO.sha256.tip;
+
+  // where a generator's seed comes from, as shown in its tooltip
+  const seedOrigin = n => alg === 'djb2'
+    ? 'первые ' + n + ' байт djb2(отпечаток:соль:0) ‖ djb2(…:1) ‖ … (djb2 даёт по 4 байта, поэтому seed набирается счётчиком)'
+    : 'первые ' + n + ' байт ' + alg + '(отпечаток:соль)';
 
   /* ---------------- generator (radio) ---------------- */
 
@@ -184,7 +233,7 @@
         'Xₙ₊₁ = (a · Xₙ + c) mod 2⁶⁴\n' +
         '<span class="dim">a  =</span> ' + LCG_A + '\n' +
         '<span class="dim">c  =</span> ' + LCG_C + '\n' +
-        '<span class="dim">X₀ =</span> первые 8 байт ' + alg + '(отпечаток:соль)\n' +
+        '<span class="dim">X₀ =</span> первые 8 байт ' + (alg === 'djb2' ? 'djb2(…:0) ‖ djb2(…:1)' : alg + '(отпечаток:соль)') + '\n' +
         '<span class="dim">→</span>  число = старшие 32 бита Xₙ' +
       '</div>' +
       '<p>Константы — Кнута (MMIX). Младшие биты у LCG слабые, поэтому берутся старшие. ' +
@@ -192,8 +241,8 @@
       'состояние можно восстановить. Быстрый, простой и предсказуемый.</p>';
     $('sfc32Label').dataset.tip =
       'SFC32 (Small Fast Counter) — быстрый генератор псевдослучайных чисел из набора тестов PractRand ' +
-      '(Chris Doty-Humphrey). Состояние — 128 бит: четыре 32-битных числа, это первые 16 байт ' + alg +
-      '(отпечаток:соль)' + (alg === 'md5' ? ', то есть весь md5' : '') + '. Проходит строгие ' +
+      '(Chris Doty-Humphrey). Состояние — 128 бит: четыре 32-битных числа, это ' + seedOrigin(16) +
+      (alg === 'md5' ? ', то есть весь md5' : '') + '. Проходит строгие ' +
       'статистические тесты, которые LCG валит. Как он устроен внутри — найди «sfc32 PractRand», если интересно.';
   }
 
@@ -222,9 +271,11 @@
     return activeSrc === 'draw' ? pad.points.length < 3 : textInput.value === '';
   }
   // text is hashed exactly as typed (UTF-8 bytes), so it matches any external md5 / sha256 tool
+  // djb2 is a single 32-bit number, shown in decimal like console.log(djb2(...)); the others in hex
   function computeFingerprint(h){
     if(sourceEmpty()) return '';
-    return bytesToHex(activeSrc === 'draw' ? digest(h, packPool(pad.points)) : digestText(h, textInput.value));
+    const bytes = activeSrc === 'draw' ? digest(h, packPool(pad.points)) : digestText(h, textInput.value);
+    return h === 'djb2' ? String(new DataView(bytes.buffer).getUint32(0)) : bytesToHex(bytes);
   }
 
   function updateCount(){
@@ -278,7 +329,7 @@
 
   // both algorithms' fingerprints of the active source, recomputed only when the source changes
   // (not on every salt tick); the hash table previews the one that isn't chosen
-  let srcFps = { md5: '', sha256: '' };
+  let srcFps = { djb2: '', md5: '', sha256: '' };
   let srcFp = '';      // srcFps[alg], '' while the source is empty
   let fpTimer = null;
 
@@ -288,7 +339,7 @@
   }
 
   function refreshFingerprint(){
-    srcFps = { md5: computeFingerprint('md5'), sha256: computeFingerprint('sha256') };
+    srcFps = { djb2: computeFingerprint('djb2'), md5: computeFingerprint('md5'), sha256: computeFingerprint('sha256') };
     srcFp = srcFps[alg];
     if(fpSync.checked && fpInput.value !== srcFp) fpInput.value = srcFp;
     onSeedInputsChanged();
@@ -393,6 +444,15 @@
   // seed for generator g = first GEN_INFO[g].seedBytes bytes of H(fingerprint:salt) = g's whole state
   const seedSource = () => fpInput.value + ':' + saltInput.value;
   const seedFor = (mix, g) => mix.slice(0, GEN_INFO[g].seedBytes);
+  // bytes the seeds are cut from: H(fingerprint:salt) — for djb2 (only 4 bytes) stretched with a counter,
+  // djb2(x:0) ‖ djb2(x:1) ‖ … up to the largest seed (16 bytes); still only 32 bits of entropy
+  const MAX_SEED_BYTES = 16;
+  function mixFor(h, src){
+    if(h !== 'djb2') return digestText(h, src);
+    const out = new Uint8Array(MAX_SEED_BYTES);
+    for(let i = 0; i < MAX_SEED_BYTES / 4; i++) out.set(digestText('djb2', src + ':' + i), i * 4);
+    return out;
+  }
 
   function updateGenState(){
     genBtn.disabled = fpInput.value.trim() === '';
@@ -402,7 +462,7 @@
   function onSeedInputsChanged(){
     updateGenState();
     showAlgRows();
-    const mix = fpInput.value.trim() === '' ? null : digestText(alg, seedSource());
+    const mix = fpInput.value.trim() === '' ? null : mixFor(alg, seedSource());
     for(const g of ['lcg', 'sfc32']) setVal(genValEl[g], mix && bytesToHex(seedFor(mix, g)));
   }
 
@@ -415,7 +475,7 @@
   // chosen row = exactly what goes into SEED: the fingerprint field + dimmed ":salt";
   // other row = that algorithm's fingerprint of the same source, as a preview
   function showAlgRows(){
-    for(const h of ['md5', 'sha256']){
+    for(const h of ['djb2', 'md5', 'sha256']){
       const el = algValEl[h];
       if(h !== alg){ setVal(el, srcFps[h]); continue; }
       const fp = fpInput.value;
@@ -533,7 +593,7 @@
     genBtn.disabled = true;
     try {
       // a fresh generator per click: the output depends on algorithm + fingerprint + salt only
-      const rng = GEN_INFO[gen].make(seedFor(digestText(alg, src), gen));
+      const rng = GEN_INFO[gen].make(seedFor(mixFor(alg, src), gen));
       let value, tag, cls;
 
       if(currentType === 'int'){

@@ -17,10 +17,14 @@
     current = el;
     if(el.dataset.tipHtml) tip.innerHTML = el.dataset.tipHtml;
     else tip.textContent = el.dataset.tip;
+    tip.classList.toggle('wide', 'tipWide' in el.dataset); // room for code listings
     el.setAttribute('aria-describedby', 'tip');
     tip.classList.add('on');
 
-    // below the element, flipped above if there's no room; clamped to the viewport
+    // below the element, flipped above if there's no room; clamped to the viewport.
+    // Measure at the origin: at its previous position the bubble would shrink to the space left of the edge
+    tip.style.left = '0px';
+    tip.style.top = '0px';
     const r = el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();
     const M = 8;
