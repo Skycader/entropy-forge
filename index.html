@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENTROPY_FORGE // rng from your hand</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="js/entropy.js" defer></script>
+<script src="js/hash.js" defer></script>
+<script src="js/prng.js" defer></script>
+<script src="js/pad.js" defer></script>
+<script src="js/app.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="glyph flicker">[ SYS::RNG ]</span>
+      <h1>ENTROPY_<span>FORGE</span></h1>
+    </div>
+    <div class="tagline">
+      Рисуй в квадрате ниже — каждое движение курсора/пальца становится источником энтропии.
+      Чем дольше и хаотичнее рисунок, тем больше бит энтропии в пуле — и тем дольше твоё
+      число или строку теоретически <b>перебирать</b>.
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: capture pad -->
+    <section class="panel">
+      <div class="panel-head"><span><span class="dot"></span>ENTROPY CAPTURE</span><span id="ptCount">0 pts</span></div>
+      <div class="pad-body">
+        <div class="canvas-shell" id="padShell">
+          <canvas id="pad"></canvas>
+          <div class="pad-hint" id="padHint"><div>рисуй здесь мышью<br>или пальцем ✎<br><b>чем хаотичнее — тем лучше</b></div></div>
+        </div>
+
+        <div class="meter-row">
+          <div class="meter">
+            <div class="label">Энтропия пула</div>
+            <div class="value" id="bitsValue">0.0 бит</div>
+          </div>
+          <div class="meter">
+            <div class="label">Перебор займёт</div>
+            <div class="value" id="yearsValue">—</div>
+          </div>
+          <div class="meter wide">
+            <div class="label">Оценка стойкости</div>
+            <div class="quality-bar"><i id="qualityFill"></i></div>
+            <div class="quality-label" id="qualityLabel">пул пуст — начни рисовать</div>
+          </div>
+        </div>
+
+        <div class="pad-actions">
+          <button class="ghost small" id="resetBtn">↺ новый пул</button>
+        </div>
+
+        <div class="hash-block">
+          <div class="hash-row">
+            <span class="hash-label">MD5(рисунок)</span>
+            <span class="hash-val" id="md5Val" data-copy>—</span>
+          </div>
+          <div class="hash-row">
+            <span class="hash-label">SHA-256(рисунок)</span>
+            <span class="hash-val" id="sha256Val" data-copy>—</span>
+          </div>
+          <div class="hash-row">
+            <span class="hash-label">SEED (из SHA-256)</span>
+            <span class="hash-val" id="seedVal" data-copy>—</span>
+          </div>
+          <div class="hash-note">md5 показан для справки — <span class="warn">он криптографически сломан</span>, seed для генератора всегда берётся из sha-256. клик по хешу — копировать.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: generator -->
+    <div class="right-col">
+
+      <section class="panel">
+        <div class="panel-head"><span><span class="dot"></span>GENERATOR</span></div>
+
+        <div class="type-tabs">
+          <button class="typeBtn active" data-type="int">randInt(a,b)</button>
+          <button class="typeBtn" data-type="double">double [0,1)</button>
+          <button class="typeBtn" data-type="string">randomString</button>
+        </div>
+
+        <div class="params" id="paramsInt">
+          <div class="field">
+            <label>a (min)</label>
+            <input type="number" id="paramA" value="1" step="1">
+          </div>
+          <div class="field">
+            <label>b (max)</label>
+            <input type="number" id="paramB" value="100" step="1">
+          </div>
+        </div>
+
+        <div class="params" id="paramsString" style="display:none;">
+          <div class="field">
+            <label>длина</label>
+            <input type="number" id="paramLen" value="16" min="1" max="512" step="1">
+          </div>
+          <div class="field grow">
+            <label>алфавит</label>
+            <input type="text" value="A-Z a-z 0-9" disabled style="opacity:.6;">
+          </div>
+        </div>
+
+        <div class="params" id="paramsDouble" style="display:none;">
+          <div class="field grow">
+            <label>диапазон</label>
+            <input type="text" value="[0.0, 1.0)" disabled style="opacity:.6;">
+          </div>
+        </div>
+
+        <div class="gen-row">
+          <button class="primary" id="genBtn" disabled>▶ СГЕНЕРИРОВАТЬ</button>
+        </div>
+
+        <div class="result-shell">
+          <div class="result-readout">
+            <span class="placeholder" id="resultPlaceholder">результат появится здесь</span>
+            <span class="rv" id="resultValue" style="display:none;"></span>
+            <button class="small" id="copyBtn" style="display:none;">copy</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span><span class="dot"></span>LOG</span><button class="small ghost" id="clearLogBtn">clear</button></div>
+        <div class="log" id="logList">
+          <div class="log-empty">записей пока нет</div>
+        </div>
+      </section>
+
+      <details class="about">
+        <summary>как это работает</summary>
+        <div class="about-body">
+          Каждая точка рисунка — это <code>{x, y, t}</code>, где <code>t</code> — время с
+          субмиллисекундной точностью. Направление штриха и джиттер тайминга дают
+          приблизительную энтропию по Шеннону (в битах). После нажатия «Сгенерировать» весь
+          накопленный пул точек хешируется алгоритмом <code>SHA-256</code>, и результат становится
+          seed'ом для генератора псевдослучайных чисел (<code>sfc32</code>). Оценка «перебор займёт»
+          — это <code>2^bits / 2</code> попыток при условной скорости атакующего 10¹² попыток/сек.
+          Оценка ограничена 128 битами — это размер внутреннего состояния <code>sfc32</code>,
+          больше энтропии до результата всё равно не дойдёт.
+          <br><br>
+          <span class="warn">Важно:</span> это учебная игрушка, а не криптографический модуль.
+          Не используй результат для генерации реальных ключей, паролей от кошельков и т.п.
+        </div>
+      </details>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
