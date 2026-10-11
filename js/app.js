@@ -95,9 +95,25 @@
     if(visible && !reducedMotion.matches) ghostTypeStep(8, true); // reduced motion: just the caret
   }
 
+  // line-number gutter: numbers every visual row (wrapped rows too — they line up with the ruled lines)
+  // and follows the textarea's scroll
+  const textGutter = $('textGutter');
+  function updateGutter(){
+    const row = parseFloat(getComputedStyle(textInput).lineHeight) || 24;
+    const rows = Math.max(1, Math.ceil(textInput.scrollHeight / row));
+    if(textGutter.dataset.rows !== String(rows)){
+      textGutter.dataset.rows = rows;
+      textGutter.textContent = Array.from({ length: rows }, (_, i) => i + 1).join('\n');
+    }
+    textGutter.scrollTop = textInput.scrollTop;
+  }
+  textInput.addEventListener('scroll', () => { textGutter.scrollTop = textInput.scrollTop; });
+  new ResizeObserver(updateGutter).observe(textInput);
+
   textInput.addEventListener('input', () => {
     textClearBtn.disabled = textInput.value === '';
     updateTextGhost();
+    updateGutter();
     onSourceChanged();
   });
   textInput.addEventListener('focus', updateTextGhost);
@@ -106,6 +122,7 @@
     textInput.value = '';
     textClearBtn.disabled = true;
     updateTextGhost();
+    updateGutter();
     onSourceChanged(true);
   });
 
@@ -114,7 +131,8 @@
   let activeSrc = 'draw';
   const srcTabs = document.querySelectorAll('.src-tab');
 
-  function setSource(src, focus){
+  // no auto-focus on the text field: the ghost typist shows until the user clicks in (and phones don't pop the keyboard)
+  function setSource(src){
     activeSrc = src;
     srcTabs.forEach(t => {
       const on = t.dataset.src === src;
@@ -126,18 +144,17 @@
     textShell.hidden = src !== 'text';
     if(src === 'draw'){ if(pad.points.length === 0) showGhost(); }
     else ghost.pauseAnimations(); // the drawing ghost is off-screen
-    if(src === 'text' && focus) textInput.focus();
     updateTextGhost();
     onSourceChanged(true);
   }
 
   srcTabs.forEach(t => {
-    t.addEventListener('click', () => setSource(t.dataset.src, true));
+    t.addEventListener('click', () => setSource(t.dataset.src));
     // arrow keys move between tabs (WAI-ARIA tabs pattern)
     t.addEventListener('keydown', e => {
       if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       const next = activeSrc === 'draw' ? 'text' : 'draw';
-      setSource(next, false);
+      setSource(next);
       document.querySelector('.src-tab[data-src="' + next + '"]').focus();
       e.preventDefault();
     });

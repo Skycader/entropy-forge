@@ -218,23 +218,53 @@ button.src-tab:focus-visible{ outline-offset:-2px; }
 .canvas-shell[hidden]{ display:none; }
 
 /* ---- text source: same square as the pad, a textarea over the grid ---- */
-.canvas-shell.text-shell{ touch-action:auto; cursor:text; user-select:auto; }
+/* text source looks like an editor, not the drawing grid: a line-number gutter + ruled rows.
+   --row is the line height; gutter numbers, ruled lines and the ghost all sit on that rhythm */
+.canvas-shell.text-shell{
+  --row:24px; --pad-top:0px; --gutter:38px;
+  /* snap the height down to a whole number of rows (+2px border) so no row is ever cut off;
+     where round() isn't supported this is ignored and the box stays square */
+  height:calc(round(down, min(100cqw, 100cqh) - 2px, var(--row)) + 2px);
+  touch-action:auto; cursor:text; user-select:auto;
+  background:#011820;
+}
+.text-gutter{
+  position:absolute; top:0; bottom:0; left:0; width:var(--gutter);
+  overflow:hidden;
+  padding:var(--pad-top) 8px 0 0;
+  background:rgba(0,20,26,.7);
+  border-right:1px solid var(--line);
+  font-family:'JetBrains Mono', monospace; font-size:11px; line-height:var(--row);
+  color:var(--fg-dim); text-align:right; white-space:pre;
+  pointer-events:none; user-select:none;
+}
 .text-shell textarea{
-  position:absolute; inset:0; width:100%; height:100%;
-  margin:0; padding:14px 16px 52px; /* bottom room for the clear button */
-  background:transparent; border:none; outline:none; resize:none;
+  position:absolute; top:0; bottom:0; right:0; left:var(--gutter);
+  width:auto; height:100%;
+  margin:0; padding:var(--pad-top) 14px 52px 12px; /* bottom room for the clear button */
+  border:none; outline:none; resize:none;
   color:var(--fg-1); caret-color:var(--cyan);
-  font-family:'JetBrains Mono', monospace; font-size:16px; line-height:1.5;
-  word-break:break-all;
+  font-family:'JetBrains Mono', monospace; font-size:15px; line-height:var(--row);
+  overflow-wrap:anywhere; /* wrap at word boundaries; split only words longer than a row */
+  /* a faint rule under every row; "local" makes the rules scroll with the text */
+  /* one tile = one row, anchored to the text box: tiles repeat above it too, so the top padding
+     gets a rule at its bottom edge and the first row is exactly as tall as the rest */
+  background:linear-gradient(to bottom,
+    transparent 0, transparent calc(var(--row) - 1px),
+    rgba(18,57,67,.55) calc(var(--row) - 1px), rgba(18,57,67,.55) var(--row));
+  background-size:100% var(--row);
+  background-origin:content-box;
+  background-attachment:local;
 }
 .text-shell textarea::selection{ background:rgba(255,62,203,.35); }
+/* the ghost types on the first row, exactly where the user's text will appear */
 .text-ghost{
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
+  position:absolute; top:var(--pad-top); left:calc(var(--gutter) + 12px); right:14px;
   pointer-events:none;
-  font-family:'JetBrains Mono', monospace; font-size:22px; letter-spacing:.08em;
+  font-family:'JetBrains Mono', monospace; font-size:15px; line-height:var(--row);
   color:var(--cyan); opacity:.5;
   text-shadow:var(--glow-cyan);
+  white-space:nowrap; overflow:hidden;
   transition:opacity .2s ease;
 }
 .text-ghost.off{ opacity:0; }
