@@ -213,11 +213,19 @@
               <span class="hash-val" id="sha256Val">—</span>
             </div>
           </div>
-          <div class="hash-row">
-            <span class="hash-label" tabindex="0" id="seedLabel">SEED</span>
-            <span class="hash-val" id="seedVal">—</span>
+          <!-- generator choice: each row shows the seed — the part of H(fingerprint:salt) that becomes
+               that generator's starting state; the unchosen row is a preview -->
+          <div class="alg-rows" role="radiogroup" aria-label="Генератор псевдослучайных чисел">
+            <div class="hash-row alg-row">
+              <label class="hash-label radio" id="lcgLabel"><input type="radio" name="gen" value="lcg"><span class="mark"></span>LCG</label>
+              <span class="hash-val" id="lcgVal">—</span>
+            </div>
+            <div class="hash-row alg-row">
+              <label class="hash-label radio" id="sfc32Label"><input type="radio" name="gen" value="sfc32" checked><span class="mark"></span>SFC32</label>
+              <span class="hash-val" id="sfc32Val">—</span>
+            </div>
           </div>
-          <div class="hash-note">одинаковые алгоритм, отпечаток и соль → одинаковый результат. наведи на подпись — пояснение, клик по значению — копировать.</div>
+          <div class="hash-note">одинаковые алгоритм, генератор, отпечаток и соль → одинаковый результат. наведи на подпись — пояснение, клик по значению — копировать.</div>
         </div>
       </details>
 
@@ -239,13 +247,14 @@
           приблизительную энтропию по Шеннону (в битах). Во вкладке «текст» источником служит сам текст: оценка — размер алфавита × число символов с поправкой на повторы и предсказуемость языка. Хеш-функция <code>H</code>
           выбирается в таблице SEED / HASH — <code>md5</code> или <code>sha256</code>:
           <br><code>отпечаток = H(источник)</code> — текст хешируется как есть, в UTF-8;
-          <br><code>seed = первые 16 байт H(отпечаток:соль)</code> — смешивает отпечаток с солью;
-          <br><code>числа = sfc32(seed)</code> — генератор псевдослучайных чисел, seed — его стартовое состояние.
-          <br>Результат зависит только от алгоритма, отпечатка и соли: их можно вписать вручную и
+          <br><code>seed = начало H(отпечаток:соль)</code> — смешивает отпечаток с солью;
+          <br><code>числа = G(seed)</code> — генератор псевдослучайных чисел <code>G</code>, тоже на выбор в таблице:
+          <code>LCG</code> (seed — 8 байт) или <code>SFC32</code> (16 байт); seed — его стартовое состояние.
+          <br>Результат зависит только от алгоритма, генератора, отпечатка и соли: их можно вписать вручную и
           воспроизвести любое прошлое значение, а соль-timestamp делает каждый клик уникальным.
           Оценка «перебор займёт» — это <code>2^bits / 2</code> попыток при условной скорости
-          атакующего 10¹² попыток/сек. Она ограничена 128 битами: столько вмещает состояние
-          <code>sfc32</code> (и весь отпечаток md5), больше энтропии до результата не дойдёт.
+          атакующего 10¹² попыток/сек. Она ограничена самым узким звеном: размером хеша и состоянием
+          генератора — 64 бита у <code>LCG</code>, 128 у <code>SFC32</code>. Больше энтропии до результата не дойдёт.
           <br><br>
           <span class="warn">Важно:</span> это учебная игрушка, а не криптографический модуль.
           Не используй результат для генерации реальных ключей, паролей от кошельков и т.п.

@@ -1,4 +1,4 @@
-/* sfc32 PRNG seeded from the pool hash + unbiased random primitives */
+/* Generators (sfc32, 64-bit LCG) seeded from the hash + unbiased random primitives */
 (function (EF) {
   "use strict";
 
@@ -21,6 +21,22 @@
     const rng = sfc32(dv.getUint32(0, true), dv.getUint32(4, true), dv.getUint32(8, true), dv.getUint32(12, true));
     for(let i=0;i<20;i++) rng(); // warm up
     return rng;
+  }
+
+  /* 64-bit LCG (Knuth, MMIX constants):  X(n+1) = (a·X(n) + c) mod 2^64.
+     X0 = the first 8 seed bytes read as one big-endian number (= the hex shown in the UI).
+     Output = the high 32 bits of X: an LCG's low bits are weak (bit 0 just alternates). */
+  const LCG_A = 6364136223846793005n;
+  const LCG_C = 1442695040888963407n;
+  const MASK64 = (1n << 64n) - 1n;
+
+  function makeLcg(seedBytes){
+    let x = 0n;
+    for(let i=0;i<8;i++) x = (x << 8n) | BigInt(seedBytes[i]);
+    return function(){
+      x = (LCG_A * x + LCG_C) & MASK64;
+      return Number(x >> 32n) / 4294967296;
+    };
   }
 
   function randUint32(rng){
@@ -81,5 +97,5 @@
     return out;
   }
 
-  EF.prng = { makeRng, randDouble, randInt, randomString };
+  EF.prng = { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString };
 })(window.EF = window.EF || {});

@@ -541,6 +541,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 /* algorithm rows: the radio sits in the label column; the unchosen row is only a preview */
 .hash-label.radio{ text-decoration:none; cursor:pointer; }
 .alg-rows .hash-row:last-of-type{ border-bottom:1px dashed var(--line); } /* the wrapper resets :last-of-type */
+.alg-rows + .alg-rows .hash-row:last-of-type{ border-bottom:none; }     /* …except at the end of the table */
 .alg-row:not(:has(input:checked)) .hash-val{ opacity:.45; }
 
 /* tooltip bubble (js/tooltip.js) */
@@ -555,6 +556,15 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
   opacity:0; visibility:hidden; transition:opacity .12s ease;
 }
 .tip.on{ opacity:1; visibility:visible; }
+.tip p{ margin:0; }
+.tip p + p, .tip .formula + p{ margin-top:6px; }
+.tip .formula{
+  margin:7px 0 0; padding:7px 9px;
+  background:var(--bg-1); border-left:2px solid var(--magenta);
+  font-family:'Share Tech Mono', monospace; font-size:12.5px; line-height:1.6;
+  color:var(--cyan); white-space:pre;
+}
+.tip .formula .dim{ color:var(--fg-dim); }
 
 .hash-note{
   font-size:10.5px; color:var(--fg-dim); line-height:1.5;
@@ -566,7 +576,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .extras{ display:contents; }
 
 /* ---- log ---- */
-.log-panel{ flex:1 1 0; min-height:96px; display:flex; flex-direction:column; }
+.log-panel{ flex:1 1 0; min-height:76px; display:flex; flex-direction:column; }
 .log-panel .caret{ display:none; } /* collapsing the log is a phone-only feature */
 .log-panel .caret::before{ content:"▸"; }
 .log-panel:not(.collapsed) .caret::before{ content:"▾"; }

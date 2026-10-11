@@ -1,16 +1,16 @@
 /* UI wiring: entropy sources (drawing / text), stats, seed inputs (algorithm + fingerprint + salt),
    generator, log.
 
-   Pipeline, with a user-chosen hash H (md5 | sha256):
+   Pipeline, with a user-chosen hash H (md5 | sha256) and generator G (lcg | sfc32):
      fingerprint = H(source)                        — editable field, synced to the drawing / text
-     seed        = first 16 bytes of H(fingerprint:salt)
-     numbers     = sfc32(seed)                      — the seed is sfc32's whole 128-bit state */
+     seed        = first N bytes of H(fingerprint:salt), N = G's state size (lcg 8, sfc32 16)
+     numbers     = G(seed) */
 (function (EF) {
   "use strict";
 
   const { estimateBits, estimateTextBits, bitsToYears, formatYears } = EF.entropy;
   const { packPool, digest, digestText, bytesToHex } = EF.hash;
-  const { makeRng, randDouble, randInt, randomString } = EF.prng;
+  const { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString } = EF.prng;
 
   const $ = id => document.getElementById(id);
 
@@ -23,7 +23,7 @@
   const qualityFillEl = $('qualityFill');
   const qualityLabelEl = $('qualityLabel');
   const algValEl = { md5: $('md5Val'), sha256: $('sha256Val') };
-  const seedValEl = $('seedVal');
+  const genValEl = { lcg: $('lcgVal'), sfc32: $('sfc32Val') };
   const genBtn = $('genBtn');
   const resetBtn = $('resetBtn');
 
@@ -164,13 +164,37 @@
   $('md5Label').dataset.tip = ALG_INFO.md5.tip;
   $('sha256Label').dataset.tip = ALG_INFO.sha256.tip;
 
+  /* ---------------- generator (radio) ---------------- */
+
+  // seedBytes = state size: the first that many bytes of H(fingerprint:salt) become the starting state
+  const GEN_INFO = {
+    lcg:   { bits: 64,  seedBytes: 8,  make: makeLcg },
+    sfc32: { bits: 128, seedBytes: 16, make: makeRng },
+  };
+  let gen = document.querySelector('input[name=gen]:checked').value;
+
+  // tooltips mention the chosen hash, so they're rebuilt when it changes. LCG gets its formula
+  // (data-tip-html → rendered as markup by tooltip.js); SFC32 only a description — dig in if curious
   function updateAlgLabels(){
     $('fpFieldLabel').textContent = alg;
-    $('seedLabel').dataset.tip =
-      'Seed — стартовое значение генератора: первые 16 байт ' + alg + '(отпечаток:соль)' +
-      (alg === 'md5' ? ' (md5 как раз 16 байт)' : '') + '. Сам генератор — sfc32 (Small Fast Counter), ' +
-      'быстрый генератор псевдослучайных чисел: из этих 16 байт он выдаёт сколько угодно чисел — для randInt, ' +
-      'double и строк любой длины. Один и тот же seed всегда даёт одну и ту же последовательность.';
+    $('lcgLabel').dataset.tipHtml =
+      '<p>LCG — линейный конгруэнтный генератор, один из старейших (Лемер, 1949). ' +
+      'Каждое следующее число получается из предыдущего одной формулой:</p>' +
+      '<div class="formula">' +
+        'Xₙ₊₁ = (a · Xₙ + c) mod 2⁶⁴\n' +
+        '<span class="dim">a  =</span> ' + LCG_A + '\n' +
+        '<span class="dim">c  =</span> ' + LCG_C + '\n' +
+        '<span class="dim">X₀ =</span> первые 8 байт ' + alg + '(отпечаток:соль)\n' +
+        '<span class="dim">→</span>  число = старшие 32 бита Xₙ' +
+      '</div>' +
+      '<p>Константы — Кнута (MMIX). Младшие биты у LCG слабые, поэтому берутся старшие. ' +
+      'Состояние всего 64 бита — энтропия ограничена 64 битами, а по нескольким выходам ' +
+      'состояние можно восстановить. Быстрый, простой и предсказуемый.</p>';
+    $('sfc32Label').dataset.tip =
+      'SFC32 (Small Fast Counter) — быстрый генератор псевдослучайных чисел из набора тестов PractRand ' +
+      '(Chris Doty-Humphrey). Состояние — 128 бит: четыре 32-битных числа, это первые 16 байт ' + alg +
+      '(отпечаток:соль)' + (alg === 'md5' ? ', то есть весь md5' : '') + '. Проходит строгие ' +
+      'статистические тесты, которые LCG валит. Как он устроен внутри — найди «sfc32 PractRand», если интересно.';
   }
 
   document.querySelectorAll('input[name=alg]').forEach(r => r.addEventListener('change', () => {
@@ -180,11 +204,16 @@
     onSeedInputsChanged();  // and a new seed even if the fingerprint was typed by hand
   }));
 
+  document.querySelectorAll('input[name=gen]').forEach(r => r.addEventListener('change', () => {
+    gen = r.value;
+    updateStats();          // the entropy cap depends on the generator's state size
+    onSeedInputsChanged();
+  }));
+
   /* ---------------- active source: bits, emptiness, fingerprint ---------------- */
 
-  // entropy is capped by the narrowest step: the fingerprint (hash size) and sfc32's 128-bit state
-  const SFC32_STATE_BITS = 128;
-  const maxBits = () => Math.min(ALG_INFO[alg].bits, SFC32_STATE_BITS);
+  // entropy is capped by the narrowest step: the fingerprint (hash size) and the generator's state
+  const maxBits = () => Math.min(ALG_INFO[alg].bits, GEN_INFO[gen].bits);
   function sourceBits(){
     const raw = activeSrc === 'draw' ? estimateBits(pad.points) : estimateTextBits(textInput.value);
     return Math.min(raw, maxBits());
@@ -361,30 +390,26 @@
 
   /* ---------------- Seed preview (hash panel) ---------------- */
 
-  // seed = first 16 bytes of H(fingerprint:salt) = sfc32's whole state
+  // seed for generator g = first GEN_INFO[g].seedBytes bytes of H(fingerprint:salt) = g's whole state
   const seedSource = () => fpInput.value + ':' + saltInput.value;
-  const computeSeed = (h, src) => digestText(h, src).slice(0, 16);
+  const seedFor = (mix, g) => mix.slice(0, GEN_INFO[g].seedBytes);
 
   function updateGenState(){
     genBtn.disabled = fpInput.value.trim() === '';
   }
 
-  // everything is synchronous now (pure-JS hashes), so the panel always matches the fields
+  // everything is synchronous (pure-JS hashes), so the panel always matches the fields
   function onSeedInputsChanged(){
     updateGenState();
     showAlgRows();
-    if(fpInput.value.trim() === ''){ showSeed(null); return; }
-    showSeed(bytesToHex(computeSeed(alg, seedSource())));
+    const mix = fpInput.value.trim() === '' ? null : digestText(alg, seedSource());
+    for(const g of ['lcg', 'sfc32']) setVal(genValEl[g], mix && bytesToHex(seedFor(mix, g)));
   }
 
   // values are ellipsized in the UI, so the full text also goes into the title
   function setVal(el, v){
     el.textContent = v || '—';
     el.title = v ? v + ' — клик, чтобы скопировать' : '';
-  }
-
-  function showSeed(seedHex){
-    setVal(seedValEl, seedHex);
   }
 
   // chosen row = exactly what goes into SEED: the fingerprint field + dimmed ":salt";
@@ -502,13 +527,13 @@
     // snapshot exactly what the fields show at the moment of the click
     const src = seedSource();
     const fromSource = srcFp !== '' && fpInput.value === srcFp;
-    const meta = alg + ' ' + (fromSource
+    const meta = alg + '/' + gen + ' ' + (fromSource
       ? (activeSrc === 'draw' ? '✎ ' : '⌨ ') + sourceBits().toFixed(1) + 'b'
       : 'ручной');
     genBtn.disabled = true;
     try {
       // a fresh generator per click: the output depends on algorithm + fingerprint + salt only
-      const rng = makeRng(computeSeed(alg, src));
+      const rng = GEN_INFO[gen].make(seedFor(digestText(alg, src), gen));
       let value, tag, cls;
 
       if(currentType === 'int'){
@@ -528,7 +553,7 @@
       resultValue.textContent = value;
       copyBtn.style.display = 'inline-block';
 
-      pushLog(tag, cls, value, meta, alg + '(' + src + ')');
+      pushLog(tag, cls, value, meta, gen + ' ← ' + alg + '(' + src + ')');
     } finally {
       updateGenState();
     }
