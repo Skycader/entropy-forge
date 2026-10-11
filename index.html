@@ -35,12 +35,22 @@
     <!-- LEFT: capture pad -->
     <section class="panel pad-panel">
       <div class="panel-head">
-        <span><span class="dot"></span>ENTROPY CAPTURE</span>
+        <!-- entropy source tabs: each keeps its own content; the active one feeds the md5 -->
+        <div class="src-tabs" role="tablist" aria-label="Источник энтропии">
+          <button class="src-tab active" role="tab" id="tabDraw" data-src="draw" aria-selected="true" aria-controls="padShell">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 7l3 3"/></svg>
+            рисунок
+          </button>
+          <button class="src-tab" role="tab" id="tabText" data-src="text" aria-selected="false" aria-controls="textShell" tabindex="-1">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>
+            текст
+          </button>
+        </div>
         <span id="ptCount">0 pts</span>
       </div>
       <div class="pad-body">
         <div class="pad-area">
-          <div class="canvas-shell" id="padShell">
+          <div class="canvas-shell" id="padShell" role="tabpanel" aria-labelledby="tabDraw">
             <canvas id="pad"></canvas>
             <!-- empty-pad hint: a ghost hand draws a scribble on loop — shows the gesture, no text to read -->
             <div class="pad-hint" id="padHint" aria-hidden="true">
@@ -60,6 +70,20 @@
               </svg>
             </div>
             <button class="pad-clear" id="resetBtn" type="button" aria-label="Очистить пул" title="Очистить пул" disabled>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 7h16"/>
+                <path d="M9 7V4.5h6V7"/>
+                <path d="M6 7l1 13h10l1-13"/>
+                <path d="M10 11v6M14 11v6"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="canvas-shell text-shell" id="textShell" role="tabpanel" aria-labelledby="tabText" hidden>
+            <textarea id="textInput" spellcheck="false" autocomplete="off" aria-label="Текст — источник энтропии"></textarea>
+            <!-- empty-text hint: a ghost types random characters and erases them — no text to read -->
+            <div class="text-ghost" id="textGhost" aria-hidden="true"><span id="textGhostChars"></span><span class="ghost-caret"></span></div>
+            <button class="pad-clear" id="textClearBtn" type="button" aria-label="Очистить текст" title="Очистить текст" disabled>
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 7h16"/>
                 <path d="M9 7V4.5h6V7"/>
@@ -139,9 +163,9 @@
         <div class="gen-line2">
           <div class="combo">
             <span class="combo-tag">md5</span>
-            <input type="text" id="md5Input" spellcheck="false" autocomplete="off" placeholder="нарисуй что-нибудь" aria-label="md5 рисунка">
-            <label class="sync" title="синхронизировать с рисунком">
-              <input type="checkbox" id="md5Sync" checked aria-label="синхронизировать с рисунком"><span class="tick"></span>
+            <input type="text" id="md5Input" spellcheck="false" autocomplete="off" placeholder="нарисуй или напиши" aria-label="md5 источника">
+            <label class="sync" title="синхронизировать с рисунком или текстом">
+              <input type="checkbox" id="md5Sync" checked aria-label="синхронизировать с рисунком или текстом"><span class="tick"></span>
             </label>
           </div>
           <div class="combo has-range">
@@ -203,8 +227,8 @@
         <div class="about-body">
           Каждая точка рисунка — это <code>{x, y, t}</code>, где <code>t</code> — время с
           субмиллисекундной точностью. Направление штриха и джиттер тайминга дают
-          приблизительную энтропию по Шеннону (в битах). Пул точек сворачивается в <code>md5</code> —
-          128-битный отпечаток рисунка. При нажатии «Сгенерировать» строка <code>md5:salt</code>
+          приблизительную энтропию по Шеннону (в битах). Во вкладке «текст» источником служит сам текст: оценка — размер алфавита × число символов с поправкой на повторы и предсказуемость языка. Активный источник сворачивается в <code>md5</code> —
+          128-битный отпечаток (текст хешируется как есть, в UTF-8). При нажатии «Сгенерировать» строка <code>md5:salt</code>
           хешируется <code>SHA-256</code>, и первые 16 байт становятся seed'ом генератора
           псевдослучайных чисел (<code>sfc32</code>). Результат зависит только от этих двух полей:
           их можно вписать вручную и воспроизвести любое прошлое значение, а соль-timestamp

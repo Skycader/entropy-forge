@@ -146,6 +146,19 @@ h1 span{ color:var(--magenta); text-shadow:var(--glow-magenta); }
 }
 .head-right{ display:flex; align-items:center; gap:12px; }
 
+/* ---- entropy source tabs (in the pad panel head) ---- */
+.src-tabs{ display:flex; gap:4px; margin:-6px 0 -7px -6px; align-self:stretch; }
+button.src-tab{
+  display:flex; align-items:center; gap:7px;
+  padding:0 10px;
+  background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0;
+  font-family:'Share Tech Mono', monospace; font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--fg-dim);
+}
+button.src-tab:hover:not(:disabled){ color:var(--fg-1); border-color:transparent; box-shadow:none; }
+button.src-tab.active{ color:var(--cyan); border-bottom-color:var(--cyan); text-shadow:var(--glow-cyan); }
+button.src-tab:focus-visible{ outline-offset:-2px; }
+
 /* ---- capture pad ---- */
 .pad-panel{ display:flex; flex-direction:column; }
 .pad-body{
@@ -197,6 +210,38 @@ h1 span{ color:var(--magenta); text-shadow:var(--glow-magenta); }
   stroke-dasharray:1; /* dashoffset lives on the element so the SMIL animation drives it */
 }
 .pad-hint .ghost-pen{ fill:var(--cyan); }
+
+.canvas-shell[hidden]{ display:none; }
+
+/* ---- text source: same square as the pad, a textarea over the grid ---- */
+.canvas-shell.text-shell{ touch-action:auto; cursor:text; user-select:auto; }
+.text-shell textarea{
+  position:absolute; inset:0; width:100%; height:100%;
+  margin:0; padding:14px 16px 52px; /* bottom room for the clear button */
+  background:transparent; border:none; outline:none; resize:none;
+  color:var(--fg-1); caret-color:var(--cyan);
+  font-family:'Share Tech Mono', monospace; font-size:16px; line-height:1.5;
+  word-break:break-all;
+}
+.text-shell textarea::selection{ background:rgba(255,62,203,.35); }
+.text-ghost{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none;
+  font-family:'Share Tech Mono', monospace; font-size:22px; letter-spacing:.08em;
+  color:var(--cyan); opacity:.5;
+  text-shadow:var(--glow-cyan);
+  transition:opacity .2s ease;
+}
+.text-ghost.off{ opacity:0; }
+.ghost-caret{
+  display:inline-block; width:.55em; height:1.1em; margin-left:2px;
+  background:var(--cyan); vertical-align:-.15em;
+}
+@media (prefers-reduced-motion: no-preference){
+  .ghost-caret{ animation:caret 1s steps(1) infinite; }
+}
+@keyframes caret{ 50%{ opacity:0; } }
 
 /* clear-pool button in the pad's bottom-right corner; hidden while the pool is empty */
 button.pad-clear{

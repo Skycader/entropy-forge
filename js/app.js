@@ -1,8 +1,8 @@
-/* UI wiring: stats, seed inputs (md5 + salt), generator, log */
+/* UI wiring: entropy sources (drawing / text), stats, seed inputs (md5 + salt), generator, log */
 (function (EF) {
   "use strict";
 
-  const { estimateBits, bitsToYears, formatYears, MAX_BITS } = EF.entropy;
+  const { estimateBits, estimateTextBits, bitsToYears, formatYears, MAX_BITS } = EF.entropy;
   const { packPool, sha256Text, md5, bytesToHex } = EF.hash;
   const { makeRng, randDouble, randInt, randomString } = EF.prng;
 
@@ -42,38 +42,145 @@
     ghost.pauseAnimations(); // no point animating under the user's drawing
   }
 
-  const pad = EF.createPad($('padShell'), $('pad'), pts => {
+  const pad = EF.createPad($('padShell'), $('pad'), () => {
     hideGhost();
     resetBtn.disabled = false;
-    ptCountEl.textContent = pts.length + ' pts';
-    updateStats();
-    scheduleDrawMd5();
+    onSourceChanged();
   });
 
   resetBtn.addEventListener('click', () => {
     pad.reset();
-    ptCountEl.textContent = '0 pts';
     showGhost();
     resetBtn.disabled = true;
-    clearTimeout(drawMd5Timer);
-    refreshDrawMd5();
-    updateStats();
+    onSourceChanged(true);
   });
+
+  /* ---------------- text source ---------------- */
+
+  const textShell = $('textShell');
+  const textInput = $('textInput');
+  const textClearBtn = $('textClearBtn');
+  const textGhost = $('textGhost');
+  const textGhostChars = $('textGhostChars');
+
+  // ghost typist: types a few random characters with human-ish jitter, erases them, repeats
+  const GHOST_CHARSET = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789#$%&*@?!';
+  let ghostTypeTimer = 0;
+  function ghostTypeStep(target, typing){
+    const len = textGhostChars.textContent.length;
+    if(typing && len < target){
+      textGhostChars.textContent += GHOST_CHARSET[Math.floor(Math.random() * GHOST_CHARSET.length)];
+      ghostTypeTimer = setTimeout(() => ghostTypeStep(target, true), 70 + Math.random() * 140);
+    } else if(typing){
+      ghostTypeTimer = setTimeout(() => ghostTypeStep(target, false), 1100); // hold the finished "word"
+    } else if(len > 0){
+      textGhostChars.textContent = textGhostChars.textContent.slice(0, -1);
+      ghostTypeTimer = setTimeout(() => ghostTypeStep(target, false), 35);
+    } else {
+      ghostTypeTimer = setTimeout(() => ghostTypeStep(6 + Math.floor(Math.random() * 6), true), 500);
+    }
+  }
+  function updateTextGhost(){
+    // visible only while the field is empty, unfocused and its tab is shown
+    const visible = activeSrc === 'text' && textInput.value === '' && document.activeElement !== textInput;
+    textGhost.classList.toggle('off', !visible);
+    clearTimeout(ghostTypeTimer);
+    ghostTypeTimer = 0;
+    textGhostChars.textContent = '';
+    if(visible && !reducedMotion.matches) ghostTypeStep(8, true); // reduced motion: just the caret
+  }
+
+  textInput.addEventListener('input', () => {
+    textClearBtn.disabled = textInput.value === '';
+    updateTextGhost();
+    onSourceChanged();
+  });
+  textInput.addEventListener('focus', updateTextGhost);
+  textInput.addEventListener('blur', updateTextGhost);
+  textClearBtn.addEventListener('click', () => {
+    textInput.value = '';
+    textClearBtn.disabled = true;
+    updateTextGhost();
+    onSourceChanged(true);
+  });
+
+  /* ---------------- source tabs ---------------- */
+
+  let activeSrc = 'draw';
+  const srcTabs = document.querySelectorAll('.src-tab');
+
+  function setSource(src, focus){
+    activeSrc = src;
+    srcTabs.forEach(t => {
+      const on = t.dataset.src === src;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+    });
+    $('padShell').hidden = src !== 'draw';
+    textShell.hidden = src !== 'text';
+    if(src === 'draw'){ if(pad.points.length === 0) showGhost(); }
+    else ghost.pauseAnimations(); // the drawing ghost is off-screen
+    if(src === 'text' && focus) textInput.focus();
+    updateTextGhost();
+    onSourceChanged(true);
+  }
+
+  srcTabs.forEach(t => {
+    t.addEventListener('click', () => setSource(t.dataset.src, true));
+    // arrow keys move between tabs (WAI-ARIA tabs pattern)
+    t.addEventListener('keydown', e => {
+      if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const next = activeSrc === 'draw' ? 'text' : 'draw';
+      setSource(next, false);
+      document.querySelector('.src-tab[data-src="' + next + '"]').focus();
+      e.preventDefault();
+    });
+  });
+
+  /* ---------------- active source: bits, emptiness, md5 ---------------- */
+
+  const utf8 = new TextEncoder();
+
+  function sourceBits(){
+    return activeSrc === 'draw' ? estimateBits(pad.points) : estimateTextBits(textInput.value);
+  }
+  function sourceEmpty(){
+    return activeSrc === 'draw' ? pad.points.length < 3 : textInput.value === '';
+  }
+  // text is hashed exactly as typed (UTF-8 bytes), so it matches any external md5 tool
+  function computeSourceMd5(){
+    if(sourceEmpty()) return '';
+    return bytesToHex(activeSrc === 'draw' ? md5(packPool(pad.points)) : md5(utf8.encode(textInput.value)));
+  }
+
+  function updateCount(){
+    ptCountEl.textContent = activeSrc === 'draw'
+      ? pad.points.length + ' pts'
+      : Array.from(textInput.value).length + ' симв';
+  }
+
+  // immediate = recompute the md5 now (tab switch, clear) instead of debouncing it
+  function onSourceChanged(immediate){
+    updateCount();
+    updateStats();
+    if(immediate){ clearTimeout(srcMd5Timer); refreshSourceMd5(); }
+    else scheduleSourceMd5();
+  }
 
   /* ---------------- Stats ---------------- */
 
   function updateStats(){
-    const points = pad.points;
-    const bits = estimateBits(points);
+    const bits = sourceBits();
     bitsValueEl.textContent = bits.toFixed(1) + ' бит';
 
     bitsSubEl.textContent = 'максимум ' + MAX_BITS;
 
-    if(points.length < 3){
+    if(sourceEmpty()){
       yearsValueEl.textContent = '—';
       yearsSubEl.innerHTML = '&nbsp;';
       qualityFillEl.style.width = '0%';
-      qualityLabelEl.textContent = 'пул пуст — начни рисовать';
+      qualityLabelEl.textContent = activeSrc === 'draw' ? 'пул пуст — начни рисовать' : 'пусто — напиши что-нибудь';
       qualityLabelEl.style.color = 'var(--fg-dim)';
     } else {
       const years = formatYears(bitsToYears(bits));
@@ -94,21 +201,20 @@
     }
   }
 
-  /* ---------------- md5 of the drawing (synced into the md5 field) ---------------- */
+  /* ---------------- md5 of the active source (synced into the md5 field) ---------------- */
 
-  let drawMd5 = '';      // md5 of the current pool, '' while the pool is too small
-  let drawMd5Timer = null;
+  let srcMd5 = '';      // md5 of the active source, '' while it's empty
+  let srcMd5Timer = null;
 
-  function scheduleDrawMd5(){
-    clearTimeout(drawMd5Timer);
-    drawMd5Timer = setTimeout(refreshDrawMd5, 60);
+  function scheduleSourceMd5(){
+    clearTimeout(srcMd5Timer);
+    srcMd5Timer = setTimeout(refreshSourceMd5, 60);
   }
 
-  function refreshDrawMd5(){
-    const points = pad.points;
-    drawMd5 = points.length < 3 ? '' : bytesToHex(md5(packPool(points)));
-    if(md5Sync.checked && md5Input.value !== drawMd5){
-      md5Input.value = drawMd5;
+  function refreshSourceMd5(){
+    srcMd5 = computeSourceMd5();
+    if(md5Sync.checked && md5Input.value !== srcMd5){
+      md5Input.value = srcMd5;
       onSeedInputsChanged();
     }
   }
@@ -120,7 +226,7 @@
   });
   md5Sync.addEventListener('change', () => {
     if(md5Sync.checked){
-      md5Input.value = drawMd5;
+      md5Input.value = srcMd5;
       onSeedInputsChanged();
     }
   });
@@ -331,8 +437,10 @@
   genBtn.addEventListener('click', async () => {
     // snapshot exactly what the fields show at the moment of the click
     const src = seedSource();
-    const fromDrawing = md5Input.value === drawMd5;
-    const meta = fromDrawing ? estimateBits(pad.points).toFixed(1) + 'b' : 'ручной md5';
+    const fromSource = srcMd5 !== '' && md5Input.value === srcMd5;
+    const meta = fromSource
+      ? (activeSrc === 'draw' ? '✎ ' : '⌨ ') + sourceBits().toFixed(1) + 'b'
+      : 'ручной md5';
     genBtn.disabled = true;
     try {
       // a fresh generator per click: the output depends on md5 + salt only
@@ -369,6 +477,7 @@
 
   updateStats();
   showGhost();
+  updateTextGhost();
   updateRateLabel();
   startTicker();
   onSeedInputsChanged();

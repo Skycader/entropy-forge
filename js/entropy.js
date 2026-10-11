@@ -61,6 +61,41 @@
     return Math.min(bits, MAX_BITS);
   }
 
+  /* Text entropy — a deliberately simple, conservative heuristic:
+       bits/char  = log2(size of the character classes used)  (brute-force alphabet)
+       characters = unique chars + ¼ per repeat, with runs ("aaaa") collapsed to one
+       language   = ×0.4 when it reads like words (mostly letters/spaces) — prose is predictable */
+  const TEXT_CLASSES = [
+    [/[a-z]/, 26], [/[A-Z]/, 26], [/[0-9]/, 10], [/[а-яё]/, 33], [/[А-ЯЁ]/, 33],
+    [/\s/, 1], [/[!-/:-@[-`{-~]/, 32],
+  ];
+  const OTHER_CLASS = 100; // any other unicode (emoji, other scripts, typographic symbols)
+
+  function estimateTextBits(text){
+    const chars = Array.from(text); // by code point, so emoji count once
+    if(chars.length === 0) return 0;
+
+    let pool = 0, hasOther = false;
+    for(const [re, size] of TEXT_CLASSES) if(chars.some(c => re.test(c))) pool += size;
+    for(const c of chars){
+      if(!TEXT_CLASSES.some(([re]) => re.test(c))){ hasOther = true; break; }
+    }
+    if(hasOther) pool += OTHER_CLASS;
+
+    let runs = 0;
+    for(let i=0;i<chars.length;i++) if(i === 0 || chars[i] !== chars[i-1]) runs++;
+    const unique = new Set(chars).size;
+    const effectiveChars = unique + 0.25 * (runs - unique);
+
+    // punctuation is normal in prose, so ¾ letters/spaces is enough; needs ≥3 distinct letters to be "words"
+    const letters = chars.filter(c => /[\p{L}\s]/u.test(c)).length;
+    const distinctLetters = new Set(chars.filter(c => /\p{L}/u.test(c))).size;
+    const looksLikeWords = letters / chars.length >= 0.75 && distinctLetters >= 3;
+    const LANGUAGE_FACTOR = looksLikeWords ? 0.4 : 1;
+
+    return Math.min(Math.log2(Math.max(pool, 2)) * effectiveChars * LANGUAGE_FACTOR, MAX_BITS);
+  }
+
   function bitsToYears(bits){
     if(bits <= 0) return 0;
     // average-case brute force = half the keyspace
@@ -72,12 +107,12 @@
 
   // -> {value, note}: short readout + an optional human-scale comparison
   function formatYears(log10Years){
-    if(log10Years < -6) return { value: '< 1 мкс', note: 'мгновенно' };
     if(log10Years < 0){
-      const years = Math.pow(10, log10Years);
-      const seconds = years * SECONDS_PER_YEAR;
+      const seconds = Math.pow(10, log10Years) * SECONDS_PER_YEAR;
+      if(seconds < 1e-6) return { value: '< 1 мкс', note: 'мгновенно' };
       let value;
-      if(seconds < 1) value = (seconds*1000).toFixed(1) + ' мс';
+      if(seconds < 1e-3) value = (seconds*1e6).toFixed(1) + ' мкс';
+      else if(seconds < 1) value = (seconds*1000).toFixed(1) + ' мс';
       else if(seconds < 60) value = seconds.toFixed(1) + ' сек';
       else if(seconds < 3600) value = (seconds/60).toFixed(1) + ' мин';
       else if(seconds < 86400) value = (seconds/3600).toFixed(1) + ' ч';
@@ -97,5 +132,5 @@
     return { value: mant.toFixed(2) + '×10^' + exp + ' лет', note };
   }
 
-  EF.entropy = { MAX_BITS, estimateBits, bitsToYears, formatYears };
+  EF.entropy = { MAX_BITS, estimateBits, estimateTextBits, bitsToYears, formatYears };
 })(window.EF = window.EF || {});
