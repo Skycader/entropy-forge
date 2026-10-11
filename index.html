@@ -14,6 +14,7 @@
 <script src="js/prng.js" defer></script>
 <script src="js/pad.js" defer></script>
 <script src="js/app.js" defer></script>
+<script src="js/tooltip.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -159,17 +160,20 @@
           <button class="primary" id="genBtn" disabled>▶ СГЕНЕРИРОВАТЬ</button>
         </div>
 
-        <!-- seed inputs: result = f(md5, salt) only — same fields, same output -->
+        <!-- seed inputs: result = f(algorithm, fingerprint, salt) only — same fields, same output -->
         <div class="gen-line2">
-          <div class="combo">
-            <span class="combo-tag">md5</span>
-            <input type="text" id="md5Input" spellcheck="false" autocomplete="off" placeholder="нарисуй или напиши" aria-label="md5 источника">
-            <label class="sync" title="синхронизировать с рисунком или текстом">
-              <input type="checkbox" id="md5Sync" checked aria-label="синхронизировать с рисунком или текстом"><span class="tick"></span>
-            </label>
+          <div class="combo-field">
+            <label class="combo-label" for="fpInput" id="fpFieldLabel">md5</label>
+            <div class="combo">
+              <input type="text" id="fpInput" spellcheck="false" autocomplete="off" placeholder="нарисуй или напиши" aria-label="отпечаток источника">
+              <label class="sync" title="синхронизировать с рисунком или текстом">
+                <input type="checkbox" id="fpSync" checked aria-label="синхронизировать с рисунком или текстом"><span class="tick"></span>
+              </label>
+            </div>
           </div>
+          <div class="combo-field">
+          <label class="combo-label" for="saltInput">salt</label>
           <div class="combo has-range">
-            <span class="combo-tag">salt</span>
             <input type="text" id="saltInput" spellcheck="false" autocomplete="off" placeholder="без соли" aria-label="соль">
             <label class="sync" title="брать текущий unix timestamp">
               <input type="checkbox" id="saltSync" checked aria-label="брать текущий unix timestamp"><span class="tick"></span>
@@ -178,6 +182,7 @@
               <input type="range" id="saltRate" min="0" max="1000" step="1" value="0" aria-label="частота обновления timestamp">
               <span class="rate-label" id="saltRateLabel">1 мс</span>
             </div>
+          </div>
           </div>
         </div>
 
@@ -196,19 +201,23 @@
       <details class="panel hash-panel" id="hashPanel" open>
         <summary class="panel-head"><span><span class="dot"></span>SEED / HASH</span><span class="caret"></span></summary>
         <div class="hash-body">
-          <div class="hash-row">
-            <span class="hash-label">вход (md5:salt)</span>
-            <span class="hash-val" id="seedSrcVal">—</span>
+          <!-- algorithm choice lives in the table: the chosen row's value (+ salt) is what goes into SEED,
+               the other row previews the same source with the other hash. Tooltips are set from js/app.js -->
+          <div class="alg-rows" role="radiogroup" aria-label="Алгоритм хеширования">
+            <div class="hash-row alg-row">
+              <label class="hash-label radio" id="md5Label"><input type="radio" name="alg" value="md5" checked><span class="mark"></span>MD5</label>
+              <span class="hash-val" id="md5Val">—</span>
+            </div>
+            <div class="hash-row alg-row">
+              <label class="hash-label radio" id="sha256Label"><input type="radio" name="alg" value="sha256"><span class="mark"></span>SHA256</label>
+              <span class="hash-val" id="sha256Val">—</span>
+            </div>
           </div>
           <div class="hash-row">
-            <span class="hash-label">SHA-256(вход)</span>
-            <span class="hash-val" id="sha256Val">—</span>
-          </div>
-          <div class="hash-row">
-            <span class="hash-label">SEED (sfc32)</span>
+            <span class="hash-label" tabindex="0" id="seedLabel">SEED</span>
             <span class="hash-val" id="seedVal">—</span>
           </div>
-          <div class="hash-note">seed — первые 16 байт SHA-256 от строки <code>md5:salt</code>. одинаковые md5 и salt → одинаковый результат. клик по значению — копировать.</div>
+          <div class="hash-note">одинаковые алгоритм, отпечаток и соль → одинаковый результат. наведи на подпись — пояснение, клик по значению — копировать.</div>
         </div>
       </details>
 
@@ -227,15 +236,16 @@
         <div class="about-body">
           Каждая точка рисунка — это <code>{x, y, t}</code>, где <code>t</code> — время с
           субмиллисекундной точностью. Направление штриха и джиттер тайминга дают
-          приблизительную энтропию по Шеннону (в битах). Во вкладке «текст» источником служит сам текст: оценка — размер алфавита × число символов с поправкой на повторы и предсказуемость языка. Активный источник сворачивается в <code>md5</code> —
-          128-битный отпечаток (текст хешируется как есть, в UTF-8). При нажатии «Сгенерировать» строка <code>md5:salt</code>
-          хешируется <code>SHA-256</code>, и первые 16 байт становятся seed'ом генератора
-          псевдослучайных чисел (<code>sfc32</code>). Результат зависит только от этих двух полей:
-          их можно вписать вручную и воспроизвести любое прошлое значение, а соль-timestamp
-          делает каждый клик уникальным. Оценка «перебор займёт»
-          — это <code>2^bits / 2</code> попыток при условной скорости атакующего 10¹² попыток/сек.
-          Оценка ограничена 128 битами — это размер внутреннего состояния <code>sfc32</code>,
-          больше энтропии до результата всё равно не дойдёт.
+          приблизительную энтропию по Шеннону (в битах). Во вкладке «текст» источником служит сам текст: оценка — размер алфавита × число символов с поправкой на повторы и предсказуемость языка. Хеш-функция <code>H</code>
+          выбирается в таблице SEED / HASH — <code>md5</code> или <code>sha256</code>:
+          <br><code>отпечаток = H(источник)</code> — текст хешируется как есть, в UTF-8;
+          <br><code>seed = первые 16 байт H(отпечаток:соль)</code> — смешивает отпечаток с солью;
+          <br><code>числа = sfc32(seed)</code> — генератор псевдослучайных чисел, seed — его стартовое состояние.
+          <br>Результат зависит только от алгоритма, отпечатка и соли: их можно вписать вручную и
+          воспроизвести любое прошлое значение, а соль-timestamp делает каждый клик уникальным.
+          Оценка «перебор займёт» — это <code>2^bits / 2</code> попыток при условной скорости
+          атакующего 10¹² попыток/сек. Она ограничена 128 битами: столько вмещает состояние
+          <code>sfc32</code> (и весь отпечаток md5), больше энтропии до результата не дойдёт.
           <br><br>
           <span class="warn">Важно:</span> это учебная игрушка, а не криптографический модуль.
           Не используй результат для генерации реальных ключей, паролей от кошельков и т.п.

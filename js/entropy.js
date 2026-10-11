@@ -1,9 +1,7 @@
-/* Entropy estimation of the drawn pool + brute-force time estimate */
+/* Entropy estimation (drawing / text) + brute-force time estimate.
+   Estimates are uncapped here; the caller caps them at the chosen hash's output size. */
 (function (EF) {
   "use strict";
-
-  // sfc32 state is 128 bits — pool entropy above that can't reach the output
-  const MAX_BITS = 128;
 
   const GUESSES_PER_SECOND = 1e12; // conservative modern brute-force assumption
   const SECONDS_PER_YEAR = 365.25 * 24 * 3600;
@@ -58,7 +56,7 @@
     const CORRELATION_DISCOUNT = 5;
     const bits = rawBits / CORRELATION_DISCOUNT;
 
-    return Math.min(bits, MAX_BITS);
+    return bits;
   }
 
   /* Text entropy — a deliberately simple, conservative heuristic:
@@ -93,7 +91,7 @@
     const looksLikeWords = letters / chars.length >= 0.75 && distinctLetters >= 3;
     const LANGUAGE_FACTOR = looksLikeWords ? 0.4 : 1;
 
-    return Math.min(Math.log2(Math.max(pool, 2)) * effectiveChars * LANGUAGE_FACTOR, MAX_BITS);
+    return Math.log2(Math.max(pool, 2)) * effectiveChars * LANGUAGE_FACTOR;
   }
 
   function bitsToYears(bits){
@@ -132,5 +130,5 @@
     return { value: mant.toFixed(2) + '×10^' + exp + ' лет', note };
   }
 
-  EF.entropy = { MAX_BITS, estimateBits, estimateTextBits, bitsToYears, formatYears };
+  EF.entropy = { estimateBits, estimateTextBits, bitsToYears, formatYears };
 })(window.EF = window.EF || {});

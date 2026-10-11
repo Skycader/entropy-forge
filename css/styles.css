@@ -357,30 +357,55 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .field input:focus{ outline:none; border-color:var(--cyan); }
 .gen-line #genBtn{ flex:none; white-space:nowrap; }
 
-/* ---- seed inputs: [tag | text | ✓] with an optional built-in rate slider along the bottom edge ---- */
+/* ---- seed inputs: a label row (algorithm name / "salt") over [text | ✓] fields;
+        the salt field has a built-in rate slider along its bottom edge ---- */
 .gen-line2{
-  display:flex; gap:10px; align-items:stretch;
+  display:flex; flex-wrap:wrap; gap:10px; align-items:stretch;
   padding:0 14px 12px;
 }
+.combo-field{
+  flex:1 1 0; min-width:190px; /* below that the 13-digit timestamp doesn't fit: wrap to two lines */
+  display:flex; flex-direction:column; gap:5px;
+}
+.combo-field:first-child{ flex-grow:1.4; } /* the fingerprint is the longer value */
+.combo-label{
+  min-height:14px;
+  font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--fg-dim);
+}
 .combo{
-  flex:1 1 0; min-width:0;
-  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center;
+  flex:1 1 auto;
+  display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center;
   background:var(--bg-0); border:1px solid var(--line); border-radius:2px;
   transition:border-color .15s ease;
 }
-.combo:first-child{ flex-grow:1.4; } /* the md5 is the longer value */
 .combo:focus-within{ border-color:var(--cyan); }
-.combo-tag{
-  padding:0 2px 0 10px;
-  font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--fg-dim);
-}
 .combo input[type=text]{
   min-width:0; width:100%;
   background:transparent; border:none; outline:none;
   color:var(--fg-1);
   font-family:'Share Tech Mono', monospace; font-size:13.5px;
-  padding:8px 6px;
+  padding:8px 6px 8px 10px;
 }
+
+/* algorithm radio (in the hash table): same square boxes as the sync checkboxes, a filled square when chosen */
+.radio{ position:relative; display:flex; align-items:center; gap:6px; cursor:pointer; }
+.radio input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.radio .mark{
+  width:12px; height:12px; border-radius:2px;
+  border:1px solid var(--fg-dim);
+  display:grid; place-items:center;
+  transition:all .15s ease;
+}
+.radio .mark::after{
+  content:""; width:6px; height:6px; border-radius:1px;
+  background:var(--cyan); box-shadow:var(--glow-cyan);
+  transform:scale(0); transition:transform .15s ease;
+}
+.radio:hover .mark{ border-color:var(--cyan); }
+.radio:has(input:checked){ color:var(--cyan); }
+.radio input:checked + .mark{ border-color:var(--cyan); }
+.radio input:checked + .mark::after{ transform:scale(1); }
+.radio input:focus-visible + .mark{ outline:2px solid var(--cyan); outline-offset:2px; }
 .combo input[type=text]::placeholder{ color:var(--fg-dim); }
 
 /* checkbox inside the field */
@@ -507,6 +532,30 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 }
 .hash-val:hover{ color:var(--cyan); text-shadow:var(--glow-cyan); }
 .hash-val.copied{ color:var(--magenta); text-shadow:var(--glow-magenta); }
+.hash-label[data-tip]{
+  cursor:help;
+  text-decoration:underline dotted var(--fg-dim); text-underline-offset:3px;
+}
+.hash-label[data-tip]:hover, .hash-label[data-tip]:focus{ color:var(--cyan); outline:none; }
+.hash-val .salt-part{ color:var(--fg-dim); }
+/* algorithm rows: the radio sits in the label column; the unchosen row is only a preview */
+.hash-label.radio{ text-decoration:none; cursor:pointer; }
+.alg-rows .hash-row:last-of-type{ border-bottom:1px dashed var(--line); } /* the wrapper resets :last-of-type */
+.alg-row:not(:has(input:checked)) .hash-val{ opacity:.45; }
+
+/* tooltip bubble (js/tooltip.js) */
+.tip{
+  position:fixed; z-index:100; left:0; top:0;
+  max-width:min(320px, calc(100vw - 16px));
+  padding:9px 12px;
+  background:var(--bg-0); border:1px solid var(--cyan); border-radius:2px;
+  box-shadow:var(--glow-cyan);
+  font-size:12px; line-height:1.55; color:var(--fg-1);
+  pointer-events:none;
+  opacity:0; visibility:hidden; transition:opacity .12s ease;
+}
+.tip.on{ opacity:1; visibility:visible; }
+
 .hash-note{
   font-size:10.5px; color:var(--fg-dim); line-height:1.5;
   margin-top:4px;
@@ -517,7 +566,7 @@ button.small{ padding:4px 9px; font-size:11px; letter-spacing:.05em; text-transf
 .extras{ display:contents; }
 
 /* ---- log ---- */
-.log-panel{ flex:1 1 0; min-height:110px; display:flex; flex-direction:column; }
+.log-panel{ flex:1 1 0; min-height:96px; display:flex; flex-direction:column; }
 .log-panel .caret{ display:none; } /* collapsing the log is a phone-only feature */
 .log-panel .caret::before{ content:"▸"; }
 .log-panel:not(.collapsed) .caret::before{ content:"▾"; }
@@ -610,7 +659,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   }
   .pad-panel{ flex:1 1 auto; }
   .pad-body{ padding:10px; gap:10px; }
-  .pad-area{ min-height:min(180px, 50vw); }
+  .pad-area{ min-height:min(160px, 45vw); }
 
   .meter-row{ gap:8px; }
   .meter{ padding:6px 10px; }
@@ -624,6 +673,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .right-col{ flex:none; overflow:visible; }
   .log-panel{ flex:1 1 0; min-height:0; }
   .log{ max-height:96px; }
+  /* height is scarce here: keep md5 + salt on one row (smaller font makes the timestamp fit) */
+  .gen-line2{ flex-wrap:nowrap; }
+  .combo-field{ min-width:0; }
 }
 
 /* short landscape (phones on their side): pad + meters side by side on the left */
@@ -654,7 +706,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .log{ max-height:96px; }
   /* the right column is narrow here but has spare height: md5 and salt go on separate lines */
   .gen-line2{ flex-wrap:wrap; }
-  .combo{ min-width:170px; }
+  .combo-field{ min-width:170px; }
 }
 
 /* compact controls, shared by phones and short landscape screens */
@@ -665,9 +717,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .gen-line{ padding:10px; gap:8px; }
   .gen-line #genBtn{ padding:9px 10px; }
   .gen-line2{ padding:0 10px 10px; gap:8px; }
-  .combo:first-child{ flex-grow:1; } /* the timestamp needs its full 13 digits; the md5 can scroll */
-  .combo-tag{ padding-left:8px; font-size:9.5px; letter-spacing:.06em; }
-  .combo input[type=text]{ font-size:12.5px; padding:7px 4px; }
+  .combo-field:first-child{ flex-grow:1; } /* the timestamp needs its full 13 digits; the fingerprint can scroll */
+  .combo-label{ font-size:9.5px; letter-spacing:.06em; }
+  .combo input[type=text]{ font-size:12.5px; padding:7px 4px 7px 8px; }
   .sync{ width:28px; margin-right:1px; }
   .result-shell{ padding:0 10px 10px; }
   .result-readout{ min-height:44px; padding:8px 10px; }

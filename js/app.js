@@ -1,9 +1,15 @@
-/* UI wiring: entropy sources (drawing / text), stats, seed inputs (md5 + salt), generator, log */
+/* UI wiring: entropy sources (drawing / text), stats, seed inputs (algorithm + fingerprint + salt),
+   generator, log.
+
+   Pipeline, with a user-chosen hash H (md5 | sha256):
+     fingerprint = H(source)                        — editable field, synced to the drawing / text
+     seed        = first 16 bytes of H(fingerprint:salt)
+     numbers     = sfc32(seed)                      — the seed is sfc32's whole 128-bit state */
 (function (EF) {
   "use strict";
 
-  const { estimateBits, estimateTextBits, bitsToYears, formatYears, MAX_BITS } = EF.entropy;
-  const { packPool, sha256Text, md5, bytesToHex } = EF.hash;
+  const { estimateBits, estimateTextBits, bitsToYears, formatYears } = EF.entropy;
+  const { packPool, digest, digestText, bytesToHex } = EF.hash;
   const { makeRng, randDouble, randInt, randomString } = EF.prng;
 
   const $ = id => document.getElementById(id);
@@ -16,14 +22,13 @@
   const yearsSubEl = $('yearsSub');
   const qualityFillEl = $('qualityFill');
   const qualityLabelEl = $('qualityLabel');
-  const seedSrcValEl = $('seedSrcVal');
-  const sha256ValEl = $('sha256Val');
+  const algValEl = { md5: $('md5Val'), sha256: $('sha256Val') };
   const seedValEl = $('seedVal');
   const genBtn = $('genBtn');
   const resetBtn = $('resetBtn');
 
-  const md5Input = $('md5Input');
-  const md5Sync = $('md5Sync');
+  const fpInput = $('fpInput');
+  const fpSync = $('fpSync');
   const saltInput = $('saltInput');
   const saltSync = $('saltSync');
   const saltRate = $('saltRate');
@@ -138,20 +143,59 @@
     });
   });
 
-  /* ---------------- active source: bits, emptiness, md5 ---------------- */
+  /* ---------------- hash algorithm (radio) ---------------- */
 
-  const utf8 = new TextEncoder();
+  const ALG_INFO = {
+    md5: {
+      name: 'MD5', bits: 128,
+      tip: 'MD5 — хеш-функция: превращает рисунок или текст любого размера в отпечаток из 32 hex-символов (128 бит). ' +
+           'Изменишь одну точку или букву — отпечаток поменяется целиком. Криптографически сломан (можно подобрать два ' +
+           'разных входа с одинаковым хешем), но как отпечаток для игрушки годится. Через двоеточие приписана соль.',
+    },
+    sha256: {
+      name: 'SHA256', bits: 256,
+      tip: 'SHA-256 — хеш-функция: превращает рисунок или текст любого размера в отпечаток из 64 hex-символов (256 бит). ' +
+           'Изменишь одну точку или букву — отпечаток поменяется целиком. Современный стандарт, коллизий не найдено. ' +
+           'Через двоеточие приписана соль.',
+    },
+  };
+  let alg = document.querySelector('input[name=alg]:checked').value;
 
+  $('md5Label').dataset.tip = ALG_INFO.md5.tip;
+  $('sha256Label').dataset.tip = ALG_INFO.sha256.tip;
+
+  function updateAlgLabels(){
+    $('fpFieldLabel').textContent = alg;
+    $('seedLabel').dataset.tip =
+      'Seed — стартовое значение генератора: первые 16 байт ' + alg + '(отпечаток:соль)' +
+      (alg === 'md5' ? ' (md5 как раз 16 байт)' : '') + '. Сам генератор — sfc32 (Small Fast Counter), ' +
+      'быстрый генератор псевдослучайных чисел: из этих 16 байт он выдаёт сколько угодно чисел — для randInt, ' +
+      'double и строк любой длины. Один и тот же seed всегда даёт одну и ту же последовательность.';
+  }
+
+  document.querySelectorAll('input[name=alg]').forEach(r => r.addEventListener('change', () => {
+    alg = r.value;
+    updateAlgLabels();
+    onSourceChanged(true);  // re-hash the source → new fingerprint (if synced)
+    onSeedInputsChanged();  // and a new seed even if the fingerprint was typed by hand
+  }));
+
+  /* ---------------- active source: bits, emptiness, fingerprint ---------------- */
+
+  // entropy is capped by the narrowest step: the fingerprint (hash size) and sfc32's 128-bit state
+  const SFC32_STATE_BITS = 128;
+  const maxBits = () => Math.min(ALG_INFO[alg].bits, SFC32_STATE_BITS);
   function sourceBits(){
-    return activeSrc === 'draw' ? estimateBits(pad.points) : estimateTextBits(textInput.value);
+    const raw = activeSrc === 'draw' ? estimateBits(pad.points) : estimateTextBits(textInput.value);
+    return Math.min(raw, maxBits());
   }
   function sourceEmpty(){
     return activeSrc === 'draw' ? pad.points.length < 3 : textInput.value === '';
   }
-  // text is hashed exactly as typed (UTF-8 bytes), so it matches any external md5 tool
-  function computeSourceMd5(){
+  // text is hashed exactly as typed (UTF-8 bytes), so it matches any external md5 / sha256 tool
+  function computeFingerprint(h){
     if(sourceEmpty()) return '';
-    return bytesToHex(activeSrc === 'draw' ? md5(packPool(pad.points)) : md5(utf8.encode(textInput.value)));
+    return bytesToHex(activeSrc === 'draw' ? digest(h, packPool(pad.points)) : digestText(h, textInput.value));
   }
 
   function updateCount(){
@@ -160,12 +204,12 @@
       : Array.from(textInput.value).length + ' симв';
   }
 
-  // immediate = recompute the md5 now (tab switch, clear) instead of debouncing it
+  // immediate = recompute the fingerprint now (tab switch, clear, algorithm) instead of debouncing it
   function onSourceChanged(immediate){
     updateCount();
     updateStats();
-    if(immediate){ clearTimeout(srcMd5Timer); refreshSourceMd5(); }
-    else scheduleSourceMd5();
+    if(immediate){ clearTimeout(fpTimer); refreshFingerprint(); }
+    else scheduleFingerprint();
   }
 
   /* ---------------- Stats ---------------- */
@@ -174,7 +218,7 @@
     const bits = sourceBits();
     bitsValueEl.textContent = bits.toFixed(1) + ' бит';
 
-    bitsSubEl.textContent = 'максимум ' + MAX_BITS;
+    bitsSubEl.textContent = 'максимум ' + maxBits();
 
     if(sourceEmpty()){
       yearsValueEl.textContent = '—';
@@ -188,7 +232,7 @@
       yearsSubEl.textContent = years.note || ' ';
       yearsValueEl.title = years.note ? years.value + ' — ' + years.note : years.value;
 
-      const pct = Math.min(100, (bits/MAX_BITS)*100);
+      const pct = Math.min(100, (bits/maxBits())*100);
       qualityFillEl.style.width = pct + '%';
 
       let label, color;
@@ -201,32 +245,34 @@
     }
   }
 
-  /* ---------------- md5 of the active source (synced into the md5 field) ---------------- */
+  /* ---------------- fingerprint of the active source (synced into the field) ---------------- */
 
-  let srcMd5 = '';      // md5 of the active source, '' while it's empty
-  let srcMd5Timer = null;
+  // both algorithms' fingerprints of the active source, recomputed only when the source changes
+  // (not on every salt tick); the hash table previews the one that isn't chosen
+  let srcFps = { md5: '', sha256: '' };
+  let srcFp = '';      // srcFps[alg], '' while the source is empty
+  let fpTimer = null;
 
-  function scheduleSourceMd5(){
-    clearTimeout(srcMd5Timer);
-    srcMd5Timer = setTimeout(refreshSourceMd5, 60);
+  function scheduleFingerprint(){
+    clearTimeout(fpTimer);
+    fpTimer = setTimeout(refreshFingerprint, 60);
   }
 
-  function refreshSourceMd5(){
-    srcMd5 = computeSourceMd5();
-    if(md5Sync.checked && md5Input.value !== srcMd5){
-      md5Input.value = srcMd5;
-      onSeedInputsChanged();
-    }
+  function refreshFingerprint(){
+    srcFps = { md5: computeFingerprint('md5'), sha256: computeFingerprint('sha256') };
+    srcFp = srcFps[alg];
+    if(fpSync.checked && fpInput.value !== srcFp) fpInput.value = srcFp;
+    onSeedInputsChanged();
   }
 
   // typing into a synced field takes it over manually
-  md5Input.addEventListener('input', () => {
-    md5Sync.checked = false;
+  fpInput.addEventListener('input', () => {
+    fpSync.checked = false;
     onSeedInputsChanged();
   });
-  md5Sync.addEventListener('change', () => {
-    if(md5Sync.checked){
-      md5Input.value = srcMd5;
+  fpSync.addEventListener('change', () => {
+    if(fpSync.checked){
+      fpInput.value = srcFp;
       onSeedInputsChanged();
     }
   });
@@ -315,28 +361,46 @@
 
   /* ---------------- Seed preview (hash panel) ---------------- */
 
-  const seedSource = () => md5Input.value + ':' + saltInput.value;
+  // seed = first 16 bytes of H(fingerprint:salt) = sfc32's whole state
+  const seedSource = () => fpInput.value + ':' + saltInput.value;
+  const computeSeed = (h, src) => digestText(h, src).slice(0, 16);
 
   function updateGenState(){
-    genBtn.disabled = md5Input.value.trim() === '';
+    genBtn.disabled = fpInput.value.trim() === '';
   }
 
-  let seedRequest = 0;
-  async function onSeedInputsChanged(){
+  // everything is synchronous now (pure-JS hashes), so the panel always matches the fields
+  function onSeedInputsChanged(){
     updateGenState();
-    const req = ++seedRequest;
-    if(md5Input.value.trim() === ''){ showSeed(null); return; }
-    const src = seedSource();
-    const digest = await sha256Text(src);
-    if(req !== seedRequest) return; // a newer input already superseded this one
-    showSeed({ src, sha256: bytesToHex(digest), seed: bytesToHex(digest.slice(0,16)) });
+    showAlgRows();
+    if(fpInput.value.trim() === ''){ showSeed(null); return; }
+    showSeed(bytesToHex(computeSeed(alg, seedSource())));
   }
 
-  // values are ellipsized in the UI, so the full text also goes into the tooltip
-  function showSeed(h){
-    for(const [el, v] of [[seedSrcValEl, h && h.src], [sha256ValEl, h && h.sha256], [seedValEl, h && h.seed]]){
-      el.textContent = v || '—';
-      el.title = v ? v + ' — клик, чтобы скопировать' : '';
+  // values are ellipsized in the UI, so the full text also goes into the title
+  function setVal(el, v){
+    el.textContent = v || '—';
+    el.title = v ? v + ' — клик, чтобы скопировать' : '';
+  }
+
+  function showSeed(seedHex){
+    setVal(seedValEl, seedHex);
+  }
+
+  // chosen row = exactly what goes into SEED: the fingerprint field + dimmed ":salt";
+  // other row = that algorithm's fingerprint of the same source, as a preview
+  function showAlgRows(){
+    for(const h of ['md5', 'sha256']){
+      const el = algValEl[h];
+      if(h !== alg){ setVal(el, srcFps[h]); continue; }
+      const fp = fpInput.value;
+      setVal(el, fp.trim() === '' ? '' : seedSource());
+      if(fp.trim() === '') continue;
+      const salt = document.createElement('span');
+      salt.className = 'salt-part';
+      salt.textContent = ':' + saltInput.value;
+      el.textContent = fp;
+      el.appendChild(salt);
     }
   }
 
@@ -434,17 +498,17 @@
     return Number.isFinite(v) ? v : fallback;
   }
 
-  genBtn.addEventListener('click', async () => {
+  genBtn.addEventListener('click', () => {
     // snapshot exactly what the fields show at the moment of the click
     const src = seedSource();
-    const fromSource = srcMd5 !== '' && md5Input.value === srcMd5;
-    const meta = fromSource
+    const fromSource = srcFp !== '' && fpInput.value === srcFp;
+    const meta = alg + ' ' + (fromSource
       ? (activeSrc === 'draw' ? '✎ ' : '⌨ ') + sourceBits().toFixed(1) + 'b'
-      : 'ручной md5';
+      : 'ручной');
     genBtn.disabled = true;
     try {
-      // a fresh generator per click: the output depends on md5 + salt only
-      const rng = makeRng(await sha256Text(src));
+      // a fresh generator per click: the output depends on algorithm + fingerprint + salt only
+      const rng = makeRng(computeSeed(alg, src));
       let value, tag, cls;
 
       if(currentType === 'int'){
@@ -464,7 +528,7 @@
       resultValue.textContent = value;
       copyBtn.style.display = 'inline-block';
 
-      pushLog(tag, cls, value, meta, src);
+      pushLog(tag, cls, value, meta, alg + '(' + src + ')');
     } finally {
       updateGenState();
     }
@@ -475,6 +539,7 @@
     if(e.key === 'Enter' && e.target.matches('input') && !genBtn.disabled) genBtn.click();
   });
 
+  updateAlgLabels();
   updateStats();
   showGhost();
   updateTextGhost();
