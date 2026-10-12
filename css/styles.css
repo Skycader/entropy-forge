@@ -378,13 +378,15 @@ button.icon-btn:hover:not(:disabled){ color:var(--amber); border-color:var(--amb
 }
 
 .gen-line{
-  display:flex; gap:10px; align-items:flex-end;
-  padding:12px 14px;
+  /* stretch: every control in the row (and the button) takes the height of the tallest one,
+     e.g. the length field with its rail; the button skips the label row via margin-top */
+  display:flex; gap:10px; align-items:stretch;
+  padding:10px 14px;
 }
 .params{ flex:1 1 auto; min-width:0; display:flex; gap:10px; }
 .field{ flex:1 1 0; min-width:64px; display:flex; flex-direction:column; gap:5px; }
 .field.grow{ flex-grow:2; }
-.field label{ font-size:10.5px; color:var(--fg-dim); letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+.field label, .field .field-label{ line-height:14px; font-size:10.5px; color:var(--fg-dim); letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
 .field input{
   background:var(--bg-0); border:1px solid var(--line); color:var(--fg-1);
   font-family:'JetBrains Mono', monospace;
@@ -392,13 +394,46 @@ button.icon-btn:hover:not(:disabled){ color:var(--amber); border-color:var(--amb
 }
 .field input:disabled{ opacity:.6; }
 .field input:focus{ outline:none; border-color:var(--cyan); }
-.gen-line #genBtn{ flex:none; white-space:nowrap; }
+
+/* alphabet for randomString: a row of checkboxes in an input-like box (same height as the inputs) */
+.charset{
+  display:flex; align-items:center; gap:4px 14px; flex-wrap:wrap;
+  min-height:35px; padding:4px 10px;
+  background:var(--bg-0); border:1px solid var(--line); border-radius:2px;
+}
+.field .chk{
+  position:relative; display:flex; align-items:center; gap:6px;
+  font-family:'JetBrains Mono', monospace; font-size:12.5px; letter-spacing:0; text-transform:none;
+  color:var(--fg-0); cursor:pointer;
+}
+.field .chk input{ /* undo the .field input styling: the real checkbox is invisible, .tick draws it */
+  position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0;
+  opacity:0; cursor:pointer;
+}
+.chk .tick{
+  width:13px; height:13px; border-radius:2px; flex:none;
+  border:1px solid var(--fg-dim);
+  display:grid; place-items:center;
+  transition:all .15s ease;
+}
+.chk .tick::after{
+  content:""; width:7px; height:3px; margin-top:-2px;
+  border:solid var(--bg-0); border-width:0 0 2px 2px;
+  transform:rotate(-45deg); opacity:0;
+}
+.chk:hover .tick{ border-color:var(--cyan); }
+.chk:has(input:checked){ color:var(--fg-1); }
+.chk input:checked + .tick{ background:var(--cyan); border-color:var(--cyan); box-shadow:var(--glow-cyan); }
+.chk input:checked + .tick::after{ opacity:1; }
+.chk input:focus-visible + .tick{ outline:2px solid var(--cyan); outline-offset:2px; }
+.gen-line #genBtn{ flex:none; white-space:nowrap; margin-top:19px; /* label row: 14px + 5px gap */ }
+.field > .combo, .field > .charset{ flex:1 1 auto; }
 
 /* ---- seed inputs: a label row (algorithm name / "salt") over [text | ✓] fields;
         the salt field has a built-in rate slider along its bottom edge ---- */
 .gen-line2{
   display:flex; flex-wrap:wrap; gap:10px; align-items:stretch;
-  padding:0 14px 12px;
+  padding:0 14px 10px;
 }
 .combo-field{
   flex:1 1 0; min-width:190px; /* below that the 13-digit timestamp doesn't fit: wrap to two lines */
@@ -474,7 +509,7 @@ button.icon-btn:hover:not(:disabled){ color:var(--amber); border-color:var(--amb
   --p:0; /* thumb position 0..1, set from JS */
   grid-column:1/-1;
   position:relative;
-  height:14px; margin:-3px 8px 3px;
+  height:14px; margin:-2px 8px 3px;
 }
 .combo-range input[type=range]{
   -webkit-appearance:none; appearance:none;
@@ -514,7 +549,19 @@ button.icon-btn:hover:not(:disabled){ color:var(--amber); border-color:var(--amb
 .combo-range.show-label .rate-label{ opacity:1; }
 .rate-label.flip{ transform:translate(calc(-100% - 20px), -50%); }
 /* when the timestamp isn't live, the rail fades (it re-enables the sync when touched) */
-.combo.has-range:not(:has(#saltSync:checked)) .combo-range{ opacity:.45; }
+.combo.has-range:has(#saltSync):not(:has(#saltSync:checked)) .combo-range{ opacity:.45; }
+/* length field: number input + rail, no checkbox column; undo the generic .field input styling */
+.len-combo{ grid-template-columns:minmax(0,1fr); }
+/* fields with a rail: no bottom padding under the text, the rail itself is the bottom edge */
+.combo.has-range input[type=text], .combo.has-range input[type=number]{ padding-bottom:2px; }
+.combo input[type=number]{
+  min-width:0; width:100%;
+  background:transparent; border:none; outline:none;
+  color:var(--fg-1);
+  font-family:'JetBrains Mono', monospace; font-size:13.5px;
+  padding:8px 6px 8px 10px;
+}
+.field .combo-range input[type=range]{ border:none; padding:0; }
 
 .result-shell{ padding:0 14px 14px; }
 .result-readout{
@@ -770,6 +817,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .field{ min-width:56px; }
   /* narrow right column: shrink the type tabs so randInt / double / randomString fit */
   .gen-panel .type-tabs button{ font-size:10px; padding:7px 2px; letter-spacing:0; }
+  /* the right column is too narrow for the full label next to the string controls: keep just ▶ */
+  .gen-line #genBtn .gen-text{ display:none; }
+  .gen-line #genBtn{ padding:9px 14px; font-size:14px; }
   .quality-label{ white-space:normal; }
   .log{ max-height:96px; }
   /* the right column is narrow here but has spare height: md5 and salt go on separate lines */
@@ -782,8 +832,11 @@ button:focus-visible, input:focus-visible, summary:focus-visible{
   .gen-panel > .panel-head{ display:none; }
   .type-tabs{ padding:10px 10px 0; }
   .type-tabs button{ padding:7px 4px; font-size:11px; }
-  .gen-line{ padding:10px; gap:8px; }
+  .gen-line{ padding:8px 10px; gap:8px; }
   .gen-line #genBtn{ padding:9px 10px; }
+  /* the alphabet checkboxes go 2×2 so the generator row stays one line on phones */
+  .charset{ display:grid; grid-template-columns:auto auto; gap:2px 10px; padding:2px 8px; }
+  .field .chk{ font-size:11px; }
   .gen-line2{ padding:0 10px 10px; gap:8px; }
   .combo-field:first-child{ flex-grow:1; } /* the timestamp needs its full 13 digits; the fingerprint can scroll */
   .combo-label{ font-size:9.5px; letter-spacing:.06em; }

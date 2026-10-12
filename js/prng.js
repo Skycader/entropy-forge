@@ -84,18 +84,26 @@
     return Number(BigInt(a) + randBigBelow(rng, bigRange));
   }
 
-  const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  function randomString(rng, length){
-    const n = CHARSET.length; // 62
-    const limit = Math.floor(256/n) * n; // 248
+  // character groups for randomString; SPECIAL = all printable ASCII punctuation
+  const CHARSETS = {
+    upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    lower:   'abcdefghijklmnopqrstuvwxyz',
+    digits:  '0123456789',
+    special: '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~',
+  };
+
+  // uniform over `charset` (≤ 256 chars): rejection sampling on random bytes avoids modulo bias
+  function randomString(rng, length, charset = CHARSETS.upper + CHARSETS.lower + CHARSETS.digits){
+    const n = charset.length;
+    const limit = Math.floor(256/n) * n;
     let out = '';
     for(let i=0;i<length;i++){
       let byte;
       do { byte = Math.floor(rng()*256); } while(byte >= limit);
-      out += CHARSET[byte % n];
+      out += charset[byte % n];
     }
     return out;
   }
 
-  EF.prng = { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString };
+  EF.prng = { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString, CHARSETS };
 })(window.EF = window.EF || {});

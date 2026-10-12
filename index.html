@@ -143,11 +143,22 @@
           <div class="params" id="paramsString" style="display:none;">
             <div class="field">
               <label for="paramLen">длина</label>
-              <input type="number" id="paramLen" value="16" min="1" max="512" step="1">
+              <!-- same built-in rail as the salt field: log scale 1…512 -->
+              <div class="combo has-range len-combo">
+                <input type="number" id="paramLen" value="16" min="1" max="512" step="1">
+                <div class="combo-range">
+                  <input type="range" id="lenRange" min="0" max="1000" step="1" aria-label="длина строки">
+                </div>
+              </div>
             </div>
             <div class="field grow">
-              <label>алфавит</label>
-              <input type="text" value="A-Z a-z 0-9" disabled>
+              <span class="field-label" id="charsetLabel">алфавит</span>
+              <div class="charset" role="group" aria-labelledby="charsetLabel">
+                <label class="chk"><input type="checkbox" name="charset" value="upper" checked><span class="tick"></span>A-Z</label>
+                <label class="chk"><input type="checkbox" name="charset" value="lower" checked><span class="tick"></span>a-z</label>
+                <label class="chk"><input type="checkbox" name="charset" value="digits" checked><span class="tick"></span>0-9</label>
+                <label class="chk" id="specialChk"><input type="checkbox" name="charset" value="special" aria-label="спецсимволы"><span class="tick"></span>#</label>
+              </div>
             </div>
           </div>
 
@@ -158,7 +169,7 @@
             </div>
           </div>
 
-          <button class="primary" id="genBtn" disabled>▶ СГЕНЕРИРОВАТЬ</button>
+          <button class="primary" id="genBtn" disabled aria-label="Сгенерировать">▶<span class="gen-text"> СГЕНЕРИРОВАТЬ</span></button>
         </div>
 
         <!-- seed inputs: result = f(algorithm, fingerprint, salt) only — same fields, same output -->

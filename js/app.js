@@ -10,7 +10,7 @@
 
   const { estimateBits, estimateTextBits, bitsToYears, formatYears } = EF.entropy;
   const { packPool, digest, digestText, bytesToHex } = EF.hash;
-  const { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString } = EF.prng;
+  const { makeRng, makeLcg, LCG_A, LCG_C, randDouble, randInt, randomString, CHARSETS } = EF.prng;
 
   const $ = id => document.getElementById(id);
 
@@ -556,6 +556,34 @@ if (djb2("олень") > djb2("погода")) {
     });
   });
 
+  /* ---------------- randomString length: number field + built-in log-scale rail ---------------- */
+
+  const lenInput = $('paramLen'), lenRange = $('lenRange');
+  const MAX_LEN = 512;
+  const rangeToLen = v => Math.max(1, Math.round(Math.pow(MAX_LEN, v / lenRange.max)));
+  const lenToRange = n => Math.round(Math.log(Math.min(MAX_LEN, Math.max(1, n))) / Math.log(MAX_LEN) * lenRange.max);
+  const paintLenRange = () => lenRange.parentElement.style.setProperty('--p', lenRange.value / lenRange.max);
+
+  lenRange.addEventListener('input', () => { lenInput.value = rangeToLen(lenRange.value); paintLenRange(); });
+  lenInput.addEventListener('input', () => {
+    lenRange.value = lenToRange(Math.trunc(Number(lenInput.value)) || 1);
+    paintLenRange();
+  });
+  lenRange.value = lenToRange(Number(lenInput.value));
+  paintLenRange();
+
+  /* ---------------- randomString alphabet (checkboxes) ---------------- */
+
+  const charsetBoxes = document.querySelectorAll('input[name=charset]');
+  const currentCharset = () =>
+    [...charsetBoxes].filter(b => b.checked).map(b => CHARSETS[b.value]).join('');
+
+  // an empty alphabet makes no sense: the last checked box can't be unchecked
+  charsetBoxes.forEach(b => b.addEventListener('change', () => {
+    if(currentCharset() === '') b.checked = true;
+  }));
+  $('specialChk').dataset.tip = 'Спецсимволы (' + CHARSETS.special.length + '): ' + CHARSETS.special;
+
   /* ---------------- Generate + log ---------------- */
 
   const resultPlaceholder = $('resultPlaceholder');
@@ -626,7 +654,7 @@ if (djb2("олень") > djb2("погода")) {
         tag = 'DBL'; cls = 'dbl';
       } else {
         const len = Math.max(1, Math.min(512, Math.trunc(readNumber('paramLen', 16)) || 16));
-        value = randomString(rng, len);
+        value = randomString(rng, len, currentCharset());
         tag = 'STR'; cls = 'str';
       }
 
