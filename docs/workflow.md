@@ -44,7 +44,9 @@
 | Ветка | только `main` |
 | Remote | `origin` → `https://github.com/Skycader/entropy-forge.git` |
 | Когда коммитить | только по просьбе владельца |
-| «cap» | закоммитить всё и запушить (`git add -A`, commit, `git push`) |
+| «cap» | закоммитить всё, запушить во все remote'ы, затем напомнить владельцу запустить `bash scripts/backup_to_obsidian.sh` |
+| Бэкап | [`scripts/backup_to_obsidian.sh`](../scripts/backup_to_obsidian.sh): zip ровно коммита HEAD в Obsidian-хранилище (`--dest` — другая папка). Запускает только владелец; Claude — только `bash -n` |
+| `.sh` в git | [`.gitattributes`](../.gitattributes): `*.sh text eol=lf`, иначе на Windows bash падает на `\r` |
 | Сообщение | английский: короткий заголовок + маркированный список изменений в теле |
 | Трейлер | `Co-Authored-By: Claude …` в конце (так оформлены все коммиты) |
 | Переводы строк | `core.autocrlf=true`; предупреждения «LF will be replaced by CRLF» — норма |
